@@ -59,9 +59,12 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
    Auf Windows erscheint ein Laufwerk **DIS_F746NG**.
 3. **`hd_firmware.bin` auf dieses Laufwerk kopieren.** Eine ST-LINK-LED blinkt während des Flashens, danach startet das Board neu.
 4. Erwartet: kurz rot/grün/blaue Balken (Test des Anzeigepfads), dann „Räume“, Bedienung per Touch wie im Browser-Simulator.
-   **Diagnose mit LED1 (grün):** dauerhaft an = `main()` erreicht, hängt danach · 1×/s blinken = Hauptschleife läuft ·
-   N kurze Blinks mit Pause = Fehler Nr. N (1 SDRAM, 2 Display) · 3 sehr schnelle Blinks = CPU-Fault.
-   Bitte bei Problemen melden, was Display (weiß/schwarz/Balken) und LED zeigen.
+   LED1 (grün) blinkt dann 1×/s.
+5. **Fehlersuche:** Hängt oder stürzt die Firmware ab, startet sie nach spätestens ~8 s von selbst neu und meldet danach 3× per LED1,
+   wo es klemmte: **N langsame Blinks** = Boot-Stufe N war zuletzt fertig (Fehler im Schritt danach), dann **1 schneller Blink** =
+   Hänger, **2 schnelle Blinks** = CPU-Fault. Stufen: 1 main · 2 MPU/Caches · 3 HAL_Init · 4 Takt 216 MHz · 5 LCD+SDRAM ·
+   6 Testbild/Layer · 7 Display an · 8 Touch · 9 LVGL-Treiber · 10 UI · 11 Hauptschleife.
+   Nach Reset-Taster/Power-Cycle wird nichts gemeldet. Bitte Blink-Anzahl und Displayinhalt melden.
 
 Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
 

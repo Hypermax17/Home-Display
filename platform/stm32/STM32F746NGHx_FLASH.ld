@@ -91,6 +91,15 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
+  /* Reset-fester Bereich fuer die Boot-Diagnose (diag.c): nicht initialisiert */
+  .noinit (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.noinit)
+    *(.noinit*)
+    . = ALIGN(4);
+  } >RAM
+
   ._user_heap_stack :
   {
     . = ALIGN(8);

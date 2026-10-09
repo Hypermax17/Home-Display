@@ -59,7 +59,7 @@ target_compile_definitions(stm32_drivers PUBLIC STM32F746xx USE_HAL_DRIVER)
 target_compile_options(stm32_drivers PRIVATE -w) # Fremdcode: Warnungen nicht anzeigen
 
 # ---- Firmware ---------------------------------------------------------------------------
-add_executable(hd_firmware main.c stm32f7xx_it.c)
+add_executable(hd_firmware main.c diag.c stm32f7xx_it.c)
 target_link_libraries(hd_firmware PRIVATE hd_ui hd_core hd_config stm32_drivers)
 target_compile_options(hd_firmware PRIVATE -Wall -Wextra)
 target_link_options(hd_firmware PRIVATE

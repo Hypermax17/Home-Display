@@ -4,16 +4,14 @@
  * Hardware:   LTDC 480x272 RGB565, Framebuffer im externen SDRAM, FT5336-Touch (I2C)
  * Laufzeit:   eine Hauptschleife (Datenservice + LVGL). UI und Daten sind ueber app_bus
  *             entkoppelt und lassen sich spaeter ohne Aenderung auf zwei RTOS-Tasks verteilen.
- * Diagnose (LED1, gruen, PI1):
- *   dauerhaft an            = main() erreicht, haengt danach (vor der Hauptschleife)
- *   1x pro Sekunde blinken  = Hauptschleife laeuft
- *   N kurze Blinks + Pause  = Fehler Nr. N: 1 = SDRAM, 2 = LCD
- *   3 sehr schnelle Blinks  = Hard-/Bus-/Usage-/MemManage-Fault (stm32f7xx_it.c)
+ * Diagnose (LED1, gruen, PI1): 1x pro Sekunde blinken = Hauptschleife laeuft. Bei Haenger/Fault meldet
+ * LED1 nach dem automatischen Neustart die letzte abgeschlossene Boot-Stufe, siehe diag.h.
  * Beim Start zeigt das Display ~0,7 s lang Farbbalken (rot/gruen/blau) als Test des Anzeigepfads.
  */
 #include <string.h>
 
 #include "data_service.h"
+#include "diag.h"
 #include "knx_backend.h"
 #include "lvgl.h"
 #include "stm32746g_discovery.h"
@@ -35,24 +33,11 @@ static data_service_t g_ds;
 static knx_mock_t g_mock;
 static knx_backend_t g_backend;
 
-/* Nicht behebbarer Fehler Nr. code: LED blinkt code-mal, dann Pause (ohne SysTick, kein Debugger noetig). */
-static void busy_wait(volatile uint32_t n)
-{
-    while (n--) {}
-}
-
+/* Nicht behebbarer Fehler: Watchdog laeuft ab -> Neustart und Meldung der Stufe (siehe diag.h). */
 static void fatal(int code)
 {
-    BSP_LED_Init(LED1);
-    for (;;) {
-        for (int i = 0; i < code; i++) {
-            BSP_LED_On(LED1);
-            busy_wait(6000000);
-            BSP_LED_Off(LED1);
-            busy_wait(6000000);
-        }
-        busy_wait(30000000);
-    }
+    (void)code;
+    for (;;) {}
 }
 
 /* SDRAM (Framebuffer) als "Normal, Write-Through, cachebar" einblenden wie in den ST-BSP-Beispielen.
@@ -160,27 +145,35 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
 int main(void)
 {
+    diag_start();
+    diag_stage(1); /* main erreicht */
     mpu_config();
     SCB_EnableICache();
     SCB_EnableDCache();
+    diag_stage(2);
     HAL_Init();
+    diag_stage(3);
     system_clock_config();
+    diag_stage(4);
 
-    BSP_LED_Init(LED1);
-    BSP_LED_On(LED1); /* "main erreicht" */
+    BSP_LED_On(LED1);
 
     /* Display: BSP_LCD_Init initialisiert den SDRAM selbst. Danach RGB565-Layer auf den Framebuffer. */
     if (BSP_LCD_Init() != LCD_OK) {
         fatal(2);
     }
+    diag_stage(5);
     draw_test_pattern();
     BSP_LCD_LayerRgb565Init(0, FB_ADDR);
+    diag_stage(6);
     BSP_LCD_SelectLayer(0);
     BSP_LCD_DisplayOn();
     HAL_Delay(700);
+    diag_stage(7);
 
     /* Touch ist nicht kritisch: ohne Touch laeuft die Anzeige trotzdem */
     g_touch_ok = (BSP_TS_Init(LCD_W, LCD_H) == TS_OK);
+    diag_stage(8);
 
     /* Datenschicht (Mock: Schaltbefehle kommen als Echo zurueck) */
     knx_mock_init(&g_mock);
@@ -199,12 +192,16 @@ int main(void)
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
+    diag_stage(9);
 
     static const ui_info_t info = { "Mock (kein Bus)", "Mockup 0.1 (STM32)" };
     ui_init(disp, &info);
+    diag_stage(10);
 
     uint32_t t_led = 0;
+    diag_stage(DIAG_LOOP_STAGE);
     for (;;) {
+        diag_kick();
         uint32_t now = HAL_GetTick();
         data_service_step(&g_ds, now);
         lv_timer_handler();
