@@ -13,7 +13,8 @@ Laufzeit: eine Hauptschleife ruft `data_service_step()` und `lv_timer_handler()`
 daher lässt sich das später ohne Änderung an `core/`/`ui/` auf zwei FreeRTOS-Tasks verteilen.
 Display: LVGL rendert partiell (2 × 480×40 Puffer im internen RAM) und kopiert in den Framebuffer im SDRAM (0xC0000000).
 
-LED1 (grün) blinkt 1×/s = Hauptschleife läuft. Schnelles Blinken (5 Hz) = Initialisierung von SDRAM, LCD oder Touch fehlgeschlagen.
+Diagnose über LED1 und Farbbalken-Testbild beim Start: siehe Kommentar am Kopf von `main.c` und die Haupt-README.
+SDRAM wird per MPU als Normal/Write-Through eingeblendet; `BSP_LCD_Init()` initialisiert den SDRAM selbst.
 
 Nächster Schritt für echtes KNX: ETH + lwIP, `knx_transport_t` auf einen UDP-Socket, FreeRTOS-Tasks (`ui_task`, `data_task`),
 Gateway-Adresse konfigurierbar.

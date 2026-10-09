@@ -4,8 +4,12 @@
  * Hardware:   LTDC 480x272 RGB565, Framebuffer im externen SDRAM, FT5336-Touch (I2C)
  * Laufzeit:   eine Hauptschleife (Datenservice + LVGL). UI und Daten sind ueber app_bus
  *             entkoppelt und lassen sich spaeter ohne Aenderung auf zwei RTOS-Tasks verteilen.
- * Diagnose:   LED1 (gruen, PI1) blinkt 1x pro Sekunde = Hauptschleife laeuft.
- *             Schnelles Blinken (5 Hz) = Initialisierung fehlgeschlagen (siehe fatal()).
+ * Diagnose (LED1, gruen, PI1):
+ *   dauerhaft an            = main() erreicht, haengt danach (vor der Hauptschleife)
+ *   1x pro Sekunde blinken  = Hauptschleife laeuft
+ *   N kurze Blinks + Pause  = Fehler Nr. N: 1 = SDRAM, 2 = LCD
+ *   3 sehr schnelle Blinks  = Hard-/Bus-/Usage-/MemManage-Fault (stm32f7xx_it.c)
+ * Beim Start zeigt das Display ~0,7 s lang Farbbalken (rot/gruen/blau) als Test des Anzeigepfads.
  */
 #include <string.h>
 
@@ -31,15 +35,62 @@ static data_service_t g_ds;
 static knx_mock_t g_mock;
 static knx_backend_t g_backend;
 
-/* Nicht behebbarer Fehler: LED schnell blinken lassen (kein Debugger noetig). */
-static void fatal(void)
+/* Nicht behebbarer Fehler Nr. code: LED blinkt code-mal, dann Pause (ohne SysTick, kein Debugger noetig). */
+static void busy_wait(volatile uint32_t n)
+{
+    while (n--) {}
+}
+
+static void fatal(int code)
 {
     BSP_LED_Init(LED1);
     for (;;) {
-        BSP_LED_Toggle(LED1);
-        HAL_Delay(100);
+        for (int i = 0; i < code; i++) {
+            BSP_LED_On(LED1);
+            busy_wait(6000000);
+            BSP_LED_Off(LED1);
+            busy_wait(6000000);
+        }
+        busy_wait(30000000);
     }
 }
+
+/* SDRAM (Framebuffer) als "Normal, Write-Through, cachebar" einblenden wie in den ST-BSP-Beispielen.
+ * Ohne MPU-Konfiguration gilt 0xC0000000 als Device-Speicher (unaligned Zugriffe -> Fault). */
+static void mpu_config(void)
+{
+    MPU_Region_InitTypeDef m = { 0 };
+
+    HAL_MPU_Disable();
+    m.Enable = MPU_REGION_ENABLE;
+    m.BaseAddress = SDRAM_DEVICE_ADDR;
+    m.Size = MPU_REGION_SIZE_16MB;
+    m.AccessPermission = MPU_REGION_FULL_ACCESS;
+    m.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+    m.IsCacheable = MPU_ACCESS_CACHEABLE;
+    m.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+    m.Number = MPU_REGION_NUMBER0;
+    m.TypeExtField = MPU_TEX_LEVEL0;
+    m.SubRegionDisable = 0x00;
+    m.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+    HAL_MPU_ConfigRegion(&m);
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+}
+
+/* Testbild: drei Farbbalken, zeigt dass SDRAM -> LTDC -> Panel funktioniert */
+static void draw_test_pattern(void)
+{
+    static const uint16_t col[3] = { 0xF800, 0x07E0, 0x001F };
+    uint16_t *fb = (uint16_t *)FB_ADDR;
+    for (int y = 0; y < LCD_H; y++) {
+        for (int x = 0; x < LCD_W; x++) {
+            fb[y * LCD_W + x] = col[x * 3 / LCD_W];
+        }
+    }
+    SCB_CleanDCache_by_Addr((uint32_t *)FB_ADDR, LCD_W * LCD_H * 2);
+}
+
+static bool g_touch_ok;
 
 /* 216 MHz aus 25-MHz-HSE (PLL 25/25*432/2), Over-Drive, Flash 7 Waitstates -- wie ST-BSP-Beispiele. */
 static void system_clock_config(void)
@@ -96,7 +147,7 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
     TS_StateTypeDef ts;
     (void)indev;
 
-    if (BSP_TS_GetState(&ts) == TS_OK && ts.touchDetected) {
+    if (g_touch_ok && BSP_TS_GetState(&ts) == TS_OK && ts.touchDetected) {
         last_x = ts.touchX[0];
         last_y = ts.touchY[0];
         data->state = LV_INDEV_STATE_PRESSED;
@@ -109,29 +160,27 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
 int main(void)
 {
+    mpu_config();
     SCB_EnableICache();
     SCB_EnableDCache();
     HAL_Init();
     system_clock_config();
 
     BSP_LED_Init(LED1);
+    BSP_LED_On(LED1); /* "main erreicht" */
 
-    /* Display: SDRAM -> Framebuffer, LTDC mit RGB565-Layer */
-    if (BSP_SDRAM_Init() != SDRAM_OK) {
-        fatal();
-    }
-    memset((void *)FB_ADDR, 0, LCD_W * LCD_H * 2);
-    SCB_CleanDCache_by_Addr((uint32_t *)FB_ADDR, LCD_W * LCD_H * 2);
+    /* Display: BSP_LCD_Init initialisiert den SDRAM selbst. Danach RGB565-Layer auf den Framebuffer. */
     if (BSP_LCD_Init() != LCD_OK) {
-        fatal();
+        fatal(2);
     }
+    draw_test_pattern();
     BSP_LCD_LayerRgb565Init(0, FB_ADDR);
     BSP_LCD_SelectLayer(0);
     BSP_LCD_DisplayOn();
+    HAL_Delay(700);
 
-    if (BSP_TS_Init(LCD_W, LCD_H) != TS_OK) {
-        fatal();
-    }
+    /* Touch ist nicht kritisch: ohne Touch laeuft die Anzeige trotzdem */
+    g_touch_ok = (BSP_TS_Init(LCD_W, LCD_H) == TS_OK);
 
     /* Datenschicht (Mock: Schaltbefehle kommen als Echo zurueck) */
     knx_mock_init(&g_mock);

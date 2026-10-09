@@ -58,8 +58,10 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
 2. **Board anschließen:** Micro-USB-Kabel in die Buchse **CN14 „ST-LINK“** (oben, neben dem Ethernet-Port), Rechner/Netzteil dahinter.
    Auf Windows erscheint ein Laufwerk **DIS_F746NG**.
 3. **`hd_firmware.bin` auf dieses Laufwerk kopieren.** Eine ST-LINK-LED blinkt während des Flashens, danach startet das Board neu.
-4. Erwartet: Display zeigt „Räume“, Bedienung per Touch wie im Browser-Simulator. LED1 (grün) blinkt 1×/s.
-   Bei **schnellem Blinken** (5 Hz) ist SDRAM, Display oder Touch nicht initialisiert worden; bitte melden.
+4. Erwartet: kurz rot/grün/blaue Balken (Test des Anzeigepfads), dann „Räume“, Bedienung per Touch wie im Browser-Simulator.
+   **Diagnose mit LED1 (grün):** dauerhaft an = `main()` erreicht, hängt danach · 1×/s blinken = Hauptschleife läuft ·
+   N kurze Blinks mit Pause = Fehler Nr. N (1 SDRAM, 2 Display) · 3 sehr schnelle Blinks = CPU-Fault.
+   Bitte bei Problemen melden, was Display (weiß/schwarz/Balken) und LED zeigen.
 
 Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
 
