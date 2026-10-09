@@ -54,11 +54,12 @@ Die UI läuft als **Browser-Simulator** (WebAssembly, eine einzelne HTML-Datei, 
 Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schalten lokal.
 
 1. **Firmware besorgen** – ohne lokale Toolchain: GitHub → Reiter *Actions* → letzter Lauf von *CI* → Artifact **hd_firmware**
-   herunterladen und entpacken. Es enthält `hd_firmware.bin` (= komplette Anwendung) sowie die Ausbaustufen
-   `hd_firmware_L0.bin` … `hd_firmware_L7.bin` für die Fehlersuche (siehe unten).
+   herunterladen und entpacken. `hd_firmware.hex` (und `.bin`) ist die komplette Anwendung; die übrigen Dateien dienten der Fehlersuche.
 2. **Board anschließen:** Micro-USB-Kabel in die Buchse **CN14 „ST-LINK“** (oben, neben dem Ethernet-Port), Rechner/Netzteil dahinter.
-   Auf Windows erscheint ein Laufwerk **DIS_F746NG**.
-3. **`hd_firmware.bin` auf dieses Laufwerk kopieren.** Eine ST-LINK-LED blinkt während des Flashens, danach startet das Board neu.
+3. **Mit STM32CubeProgrammer flashen** (kostenlos, ST-Konto zum Download nötig): *ST-LINK* wählen → *Connect* → Reiter
+   *Erasing & Programming* → `hd_firmware.hex` wählen → *Verify programming* und *Run after programming* anhaken → *Start Programming*.
+   **Nicht per Drag-and-Drop auf das Laufwerk `DIS_F746NG`:** Das ST-LINK-Laufwerk schreibt auf diesem Board nur die ersten ~32–64 KB einer
+   Datei; die Anwendung ist ~455 KB groß und stürzt dadurch vor `main()` ab (siehe Fehlersuche unten). Drag-and-Drop reicht nur für Testprogramme unter 32 KB.
 4. Erwartet: kurz rot/grün/blaue Balken (Test des Anzeigepfads), dann „Räume“, Bedienung per Touch wie im Browser-Simulator.
    LED1 (grün) blinkt dabei 8× pro 3-Sekunden-Zyklus (Stufe 7).
 
