@@ -78,6 +78,7 @@ bitte abfotografieren.
 | 5 | Layer, Testbild, Display an | LED 6 Pulse, Farbbalken |
 | 6 | Touch-Init | LED 7 Pulse, Farbbalken |
 | 7 | LVGL, UI, Datenschicht | LED 8 Pulse, Anwendung |
+| 7 (`_sram1`) | wie 7, RAM erst ab 0x20010000 (statt DTCM) | wie 7 |
 
 Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
 

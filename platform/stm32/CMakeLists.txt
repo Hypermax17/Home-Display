@@ -61,15 +61,21 @@ target_compile_options(stm32_drivers PRIVATE -w) # Fremdcode: Warnungen nicht an
 # ---- Firmware ---------------------------------------------------------------------------
 # Ausbaustufe 0..7 (siehe main.c); 7 = komplette Anwendung
 set(HD_BOOT_LEVEL 7 CACHE STRING "Ausbaustufe der Firmware (0..7)")
+# RAM ab SRAM1 (0x20010000) statt ab DTCM (0x20000000): vermeidet Objekte, die die DTCM/SRAM1-Grenze ueberspannen
+option(HD_RAM_SRAM1 "Linker-Skript mit RAM erst ab SRAM1 verwenden" OFF)
+set(HD_LD_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH.ld)
+if(HD_RAM_SRAM1)
+    set(HD_LD_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH_SRAM1.ld)
+endif()
 add_executable(hd_firmware main.c stm32f7xx_it.c fault_screen.c)
 target_compile_definitions(hd_firmware PRIVATE HD_BOOT_LEVEL=${HD_BOOT_LEVEL})
 target_link_libraries(hd_firmware PRIVATE hd_ui hd_core hd_config stm32_drivers)
 target_compile_options(hd_firmware PRIVATE -Wall -Wextra)
 target_link_options(hd_firmware PRIVATE
-    -T${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH.ld
+    -T${HD_LD_SCRIPT}
     --specs=nano.specs --specs=nosys.specs
     -Wl,-Map=${CMAKE_BINARY_DIR}/hd_firmware.map -Wl,--gc-sections -Wl,--print-memory-usage)
-set_target_properties(hd_firmware PROPERTIES SUFFIX ".elf" LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH.ld")
+set_target_properties(hd_firmware PROPERTIES SUFFIX ".elf" LINK_DEPENDS "${HD_LD_SCRIPT}")
 
 add_custom_command(TARGET hd_firmware POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:hd_firmware> ${CMAKE_BINARY_DIR}/hd_firmware.bin

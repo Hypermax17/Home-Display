@@ -49,7 +49,11 @@ void fault_c(uint32_t *frame)
     hex8(l_sp + 3, fp);
     hex8(l_hp + 3, (uint32_t)&end);
 
-    fault_screen_draw((uint16_t *)0xC0000000u, 480, 272, lines, 8);
+    /* Nur zeichnen, wenn das Display schon laeuft (LTDC getaktet und aktiv): sonst waere SDRAM nicht erreichbar,
+     * der Zugriff wuerde einen weiteren Fehler ausloesen. */
+    if ((RCC->APB2ENR & RCC_APB2ENR_LTDCEN) && (LTDC->GCR & LTDC_GCR_LTDCEN)) {
+        fault_screen_draw((uint16_t *)0xC0000000u, 480, 272, lines, 8);
+    }
 
     BSP_LED_Init(LED1);
     for (;;) {

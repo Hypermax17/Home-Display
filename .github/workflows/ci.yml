@@ -36,6 +36,12 @@ jobs:
             cmake --build build-L$L -j --target hd_firmware
             cp build-L$L/hd_firmware.bin out/hd_firmware_L$L.bin
           done
+          # Variante von Stufe 7 mit RAM ab SRAM1 (0x20010000) statt ab DTCM
+          cmake -S . -B build-L7s -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
+                -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
+                -DHD_BOOT_LEVEL=7 -DHD_RAM_SRAM1=ON -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
+          cmake --build build-L7s -j --target hd_firmware
+          cp build-L7s/hd_firmware.bin out/hd_firmware_L7_sram1.bin
           cp out/hd_firmware_L7.bin out/hd_firmware.bin
           ls -l out
       - uses: actions/upload-artifact@v4
