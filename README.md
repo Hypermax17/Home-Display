@@ -25,7 +25,7 @@ Proof of Concept (eine Lampe über KNX schalten). Die Anbindung läuft über ein
 * **`ui/`** – LVGL 9.2. Kennt kein KNX. Zustand kommt ausschließlich per Event, Bedienung geht ausschließlich als Kommando raus.
   Die UI zeigt immer den vom Bus bestätigten Zustand (Geräte mit Rückmeldeadresse), kein optimistisches Raten.
 * **`config/house_config.c`** – Räume, Geräte, Gruppenadressen. Später aus dem ETS-Export generiert (Schnittstelle `house_config()` bleibt).
-* **`platform/sim`** – PC-Simulator (SDL-Fenster, headless oder WebAssembly im Browser) mit UDP-Transport (nativ). **`platform/stm32`** – Portplan (noch nicht umgesetzt).
+* **`platform/sim`** – PC-Simulator (SDL-Fenster, headless oder WebAssembly im Browser) mit UDP-Transport (nativ). **`platform/stm32`** – Firmware für das Board (Mock-Backend; Ethernet/KNX folgt).
 
 Navigation: `Räume` → `Raum (Geräte)` → `Gerät (Detail, z. B. Dimmer)`; Zahnrad → `Einstellungen` (KNX-Status, Gateway, Version).
 Die Statusleiste zeigt dauerhaft den KNX-Link (grün verbunden / orange verbindet / rot getrennt); Befehle ohne Verbindung
@@ -48,6 +48,30 @@ Die UI läuft als **Browser-Simulator** (WebAssembly, eine einzelne HTML-Datei, 
   emcmake cmake -S . -B build-web -DHD_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=MinSizeRel
   cmake --build build-web --target hd_web      # -> build-web/index.html
   ```
+
+## Auf dem Board ausführen (STM32F746G-DISCO, Mock)
+
+Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schalten lokal.
+
+1. **Firmware besorgen** – ohne lokale Toolchain: GitHub → Reiter *Actions* → letzter Lauf von *CI* → Artifact **hd_firmware**
+   herunterladen und entpacken (enthält `hd_firmware.bin`). Selbst bauen: siehe unten.
+2. **Board anschließen:** Micro-USB-Kabel in die Buchse **CN14 „ST-LINK“** (oben, neben dem Ethernet-Port), Rechner/Netzteil dahinter.
+   Auf Windows erscheint ein Laufwerk **DIS_F746NG**.
+3. **`hd_firmware.bin` auf dieses Laufwerk kopieren.** Eine ST-LINK-LED blinkt während des Flashens, danach startet das Board neu.
+4. Erwartet: Display zeigt „Räume“, Bedienung per Touch wie im Browser-Simulator. LED1 (grün) blinkt 1×/s.
+   Bei **schnellem Blinken** (5 Hz) ist SDRAM, Display oder Touch nicht initialisiert worden; bitte melden.
+
+Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
+
+Selbst bauen (Linux/WSL, `gcc-arm-none-eabi` und `cmake` installiert; HAL/BSP werden automatisch geladen):
+
+```sh
+cmake -S . -B build-stm32 -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
+      -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-stm32 --target hd_firmware     # -> build-stm32/hd_firmware.bin
+```
+
+Größe: ca. 453 KB Flash (43 %), 200 KB RAM (61 %).
 
 ## Bauen & Ausprobieren (nativ, Linux / WSL)
 
@@ -76,7 +100,7 @@ Ohne Hardware: `python3 tools/fake_knx_gateway.py --toggle-after 10` startet ein
 ```
 Skriptbefehle: `wait`, `tap x y`, `drag x1 y1 x2 y2`, `shot name.ppm`, `quit` (siehe `tests/scripts/`).
 
-### Zielcompiler-Check (Cortex-M7)
+### Zielcompiler-Check (nur Kern + UI)
 
 ```sh
 cmake -S . -B build-arm -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF
@@ -85,7 +109,7 @@ cmake --build build-arm --target hd_core hd_ui hd_config
 
 ## Nächste Schritte
 
-1. STM32-Port (siehe `platform/stm32/README.md`): LTDC/SDRAM/Touch, lwIP, FreeRTOS-Tasks.
+1. KNX auf dem Board: ETH + lwIP, UDP-Transport, FreeRTOS-Tasks (siehe `platform/stm32/README.md`).
 2. Generator ETS-Export (`.knxproj`) → `house_config.c`.
 3. Weitere Gerätetypen (Jalousie, Szenen, Fensterkontakte, Heizung) – jeweils DPT in `dpt.c`, Typ in `model.h`, Karte in `ui_page_room.c`.
 4. Einstellungen persistent (Gateway-IP), Bildschirmschoner/Helligkeit, ggf. Gateway-Auswahl per Discovery (SEARCH_REQUEST).

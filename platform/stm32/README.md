@@ -1,19 +1,19 @@
-# STM32F746G-DISCO Port (noch nicht umgesetzt)
+# STM32F746G-DISCO Firmware
 
-`core/` und `ui/` sind bereits fuer Cortex-M7 verifiziert (`cmake -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF`):
-Kern ~3 KB Flash, UI ~134 KB (davon der Grossteil Fonts), LVGL ~234 KB, LVGL-Heap 96 KB RAM.
+Stand: **Mock-Backend** (kein Netzwerk). Dieselbe `core/`- und `ui/`-Schicht wie im Simulator; hier liegt nur die Plattform:
 
-Was dieser Port liefern muss (alles Plattformcode, nichts davon beruehrt `core/` oder `ui/`):
+| Datei | Inhalt |
+|---|---|
+| `main.c` | Takt (216 MHz), Caches, SDRAM, LTDC (RGB565-Layer), FT5336-Touch, LVGL-Treiber, Hauptschleife |
+| `stm32f7xx_hal_conf.h`, `stm32f7xx_it.c` | HAL-Konfiguration, SysTick |
+| `STM32F746NGHx_FLASH.ld` | Linker-Skript (1 MB Flash, 320 KB RAM) |
+| `CMakeLists.txt` | lädt HAL/CMSIS/BSP automatisch aus dem offiziellen STM32CubeF7 (v1.17.2) und baut `hd_firmware.{elf,bin,hex}` |
 
-| Baustein | Umsetzung | Ersatz fuer (Simulator) |
-|---|---|---|
-| Takt, Cache, MPU | CubeMX / HAL | - |
-| Display | LTDC 480x272 RGB565, Framebuffer im SDRAM (FMC, 8 MB), `lv_display_create` + Flush-Callback (Doppelpuffer/Partial) | `lv_sdl_window_create` |
-| Touch | FT5336 ueber I2C (BSP `STM32746G-Discovery`), `lv_indev_create` Pointer | `lv_sdl_mouse_create` |
-| Tick | `lv_tick_set_cb(HAL_GetTick)` | `now_ms()` |
-| Netzwerk | ETH + lwIP (DHCP oder statische IP); `knx_transport_t` auf UDP-Socket (connect auf Gateway:3671, nicht blockierend) | `platform/sim/sim_udp.c` |
-| Tasks (FreeRTOS) | `ui_task`: `lv_timer_handler()` ca. alle 5 ms. `data_task`: `data_service_step(now)` ca. alle 2 ms. Mehr nicht -- die Kommunikation laeuft ueber `app_bus` (lock-frei, kein Mutex noetig). LVGL nur aus `ui_task` ansprechen. | pthread in `platform/sim/main.c` |
-| Konfiguration | Gateway-IP/Port, spaeter ueber Einstellungsseite + Flash/QSPI | `--gateway` |
+Laufzeit: eine Hauptschleife ruft `data_service_step()` und `lv_timer_handler()`. Daten und UI sprechen nur über `app_bus`,
+daher lässt sich das später ohne Änderung an `core/`/`ui/` auf zwei FreeRTOS-Tasks verteilen.
+Display: LVGL rendert partiell (2 × 480×40 Puffer im internen RAM) und kopiert in den Framebuffer im SDRAM (0xC0000000).
 
-Empfehlung: CubeMX-Projekt (oder STM32CubeIDE/CMake) fuer das Board erzeugen, `core/`, `ui/`, `config/` als Bibliotheken
-(`hd_core`, `hd_ui`, `hd_config`) einbinden und `main.c` nach dem Muster von `platform/sim/main.c` schreiben.
+LED1 (grün) blinkt 1×/s = Hauptschleife läuft. Schnelles Blinken (5 Hz) = Initialisierung von SDRAM, LCD oder Touch fehlgeschlagen.
+
+Nächster Schritt für echtes KNX: ETH + lwIP, `knx_transport_t` auf einen UDP-Socket, FreeRTOS-Tasks (`ui_task`, `data_task`),
+Gateway-Adresse konfigurierbar.

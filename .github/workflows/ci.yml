@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  host-tests:
+    name: Unit-Tests (PC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Abhängigkeiten
+        run: sudo apt-get update && sudo apt-get install -y cmake libsdl2-dev
+      - name: Bauen und testen
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+          ctest --test-dir build --output-on-failure
+
+  firmware:
+    name: Firmware STM32F746G-DISCO
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: sudo apt-get update && sudo apt-get install -y cmake gcc-arm-none-eabi
+      - name: Bauen
+        run: |
+          cmake -S . -B build-stm32 -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
+                -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-stm32 -j --target hd_firmware
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hd_firmware
+          path: |
+            build-stm32/hd_firmware.bin
+            build-stm32/hd_firmware.hex
+            build-stm32/hd_firmware.map
+          if-no-files-found: error

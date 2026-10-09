@@ -7,4 +7,5 @@ set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 set(HD_MCU_FLAGS "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard")
 set(CMAKE_C_FLAGS_INIT "${HD_MCU_FLAGS} -ffunction-sections -fdata-sections")
-set(CMAKE_EXE_LINKER_FLAGS_INIT "${HD_MCU_FLAGS} -Wl,--gc-sections --specs=nano.specs")
+set(CMAKE_EXE_LINKER_FLAGS_INIT "${HD_MCU_FLAGS}")
+set(CMAKE_ASM_FLAGS_INIT "${HD_MCU_FLAGS}")

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(home_display C)
+project(home_display C ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -7,6 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(HD_BUILD_SIM   "PC-Simulator (SDL2) bauen"        ON)
 option(HD_BUILD_TESTS "Unit-Tests bauen"                 ON)
+option(HD_BUILD_STM32 "Firmware fuer STM32F746G-DISCO bauen (braucht cmake/arm-none-eabi.cmake)" OFF)
 
 # ---------------------------------------------------------------- LVGL
 include(FetchContent)
@@ -74,4 +75,9 @@ if(HD_BUILD_TESTS)
     target_link_libraries(test_core PRIVATE hd_core)
     target_compile_options(test_core PRIVATE -Wall -Wextra)
     add_test(NAME core COMMAND test_core)
+endif()
+
+# ---------------------------------------------------------------- Firmware (STM32F746G-DISCO)
+if(HD_BUILD_STM32)
+    add_subdirectory(platform/stm32)
 endif()
