@@ -51,60 +51,34 @@ Die UI läuft als **Browser-Simulator** (WebAssembly, eine einzelne HTML-Datei, 
 
 ## Auf dem Board ausführen (STM32F746G-DISCO, Mock)
 
-Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schalten lokal.
+Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk; alle Geräte schalten lokal.
 
 1. **Firmware besorgen** – ohne lokale Toolchain: GitHub → Reiter *Actions* → letzter Lauf von *CI* → Artifact **hd_firmware**
-   herunterladen und entpacken. `hd_firmware.hex` (und `.bin`) ist die komplette Anwendung; die übrigen Dateien dienten der Fehlersuche.
+   herunterladen und entpacken (`hd_firmware.hex`/`.bin`; `.elf` und `.map` zum Nachschlagen von Fehleradressen).
 2. **Board anschließen:** Micro-USB-Kabel in die Buchse **CN14 „ST-LINK“** (oben, neben dem Ethernet-Port), Rechner/Netzteil dahinter.
 3. **Mit STM32CubeProgrammer flashen** (kostenlos, ST-Konto zum Download nötig): *ST-LINK* wählen → *Connect* → Reiter
    *Erasing & Programming* → `hd_firmware.hex` wählen → *Verify programming* und *Run after programming* anhaken → *Start Programming*.
-   **Nicht per Drag-and-Drop auf das Laufwerk `DIS_F746NG`:** Das ST-LINK-Laufwerk schreibt auf diesem Board nur die ersten ~32–64 KB einer
-   Datei; die Anwendung ist ~455 KB groß und stürzt dadurch vor `main()` ab (siehe Fehlersuche unten). Drag-and-Drop reicht nur für Testprogramme unter 32 KB.
-4. Erwartet: kurz rot/grün/blaue Balken (Test des Anzeigepfads), dann „Räume“, Bedienung per Touch wie im Browser-Simulator.
-   LED1 (grün) blinkt dabei 8× pro 3-Sekunden-Zyklus (Stufe 7).
+4. Erwartet: Oberfläche „Räume“, Bedienung per Touch wie im Browser-Simulator. LED1 (grün) blinkt 1× pro Sekunde.
 
-**Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu (`HD_BOOT_LEVEL` 0–12, siehe `platform/stm32/main.c`).
-Stufe 0–7 laufen auf dem Board (Display zeigt Farbbalken). Stufe 8 (`lv_init` + LVGL-Tick) stürzt dagegen **vor** der ersten Zeile von
-`main()` ab (Takt noch 16 MHz), obwohl der neue Code dort noch gar nicht läuft. Verdacht: schon Größe oder Inhalt des Programms lösen es aus.
-**Befund (Foto von `flashinfo`):** Flash-Schutz ist aus (`OPTCR = C0FFAAFD`, `OPTCR1 = 00400080`). Nach dem Flashen von `pad_flash.bin`
-(190 KB, überall `A5A5A5A5` an `S1`…`S4`) steht aber nur bei `S1` das Muster, bei `S2…S6` alter Inhalt: **große Dateien werden per
-Drag-and-Drop nur zum Teil in den Flash geschrieben** (ca. die ersten 32–64 KB). Der Startcode liest `.data` und `.init_array` am Ende des
-Programms, bekommt Müll und stürzt vor `main()` ab. LVGL ist nicht die Ursache; Programme unter 32 KB laufen.
+**Nicht per Drag-and-Drop auf das Laufwerk `DIS_F746NG` flashen.** Auf diesem Board schreibt das ST-LINK-Laufwerk von großen Dateien nur die
+ersten ~32–64 KB in den Flash (nachgewiesen mit einem Testprogramm, das die Flash-Sektoren ausliest). Die Anwendung ist ~455 KB groß; sie stürzt dann
+vor `main()` ab, weil der Startcode `.data`/`.init_array` am Ende des Programms liest. Das Display bleibt weiß, LED1 blinkt 3× kurz, lang, 1× kurz
+(Fehlersuche-Stand mit Stufenanzeige). Kleine Testprogramme unter 32 KB lassen sich so aber flashen.
 
-**Prüfablauf für das Flashen großer Dateien** (bestanden = `S1…S4` zeigen je `A5A5A5A5`):
-1. `hd_firmware_L7_pad_flash.bin` flashen (stürzt erwartungsgemäß ab, Blinkmuster 3×/lang/1×).
-2. `hd_firmware_L7_flashinfo.bin` flashen (26 KB, erreicht `main()`), die Zeilen `S1`…`S4` ablesen.
-Vollständig geschrieben sind `S1`, `S2`, `S3`, `S4` alle `A5A5A5A5`; bleibt `S2` oder höher abweichend, wird die Datei abgeschnitten.
+**Fehleranzeige:** Bei einem CPU-Fault (Hard-/Bus-/Usage-/MemManage-Fault) zeigt das Display – sofern es schon läuft – auf rotem Grund
+`PC`, `LR`, `CFSR`, `HFSR`, `BFAR`, `MMFAR`, `SP`, `HP`; LED1 blinkt 3× kurz mit Pause. Mit `PC`/`LR` und der `.elf` aus dem Artifact lässt sich die
+Stelle nachschlagen: `arm-none-eabi-addr2line -f -e hd_firmware.elf 0x<PC>`. Dauerhaftes schnelles Blinken (5 Hz) heißt: SDRAM, LCD oder Touch
+ließ sich nicht initialisieren.
 
-**Ergebnis des Prüfablaufs:** `S1…S4` blieben auch nach frischem Flashen von `pad_flash.bin` unverändert (nur `S1` = `A5A5A5A5`). Das ST-LINK-Laufwerk
-schreibt große Dateien also nicht vollständig. **Große Dateien (die komplette Anwendung, `hd_firmware.hex`/`.bin` = Stufe 12) deshalb über die
-Debug-Schnittstelle flashen** (nächster Abschnitt); nur Programme unter ~32 KB per Drag-and-Drop.
-
-**Wege, größere Dateien zuverlässig zu flashen:**
-* Drag-and-Drop robuster machen: Windows-Datenträgerrichtlinie auf *Schnelles Entfernen* stellen (Geräte-Manager → Laufwerke →
-  „MBED microcontroller“ → Eigenschaften → Richtlinien), Datei per `copy hd_firmware.bin X:\` in der Eingabeaufforderung kopieren und
-  warten, bis die ST-LINK-LED aufhört zu blinken, bevor das Board getrennt oder zurückgesetzt wird.
-* Über die Debug-Schnittstelle des ST-LINK schreiben (Schreiben **mit Verifizierung**): *STM32CubeProgrammer* (kostenlos, ST-Konto nötig):
-  Verbinden („ST-LINK“, Mode *Normal*) → Reiter *Erasing & Programming* → `hd_firmware_*.hex` wählen → *Verify programming* an → *Start Programming*.
-  Alternativ OpenOCD: `openocd -f board/stm32f7discovery.cfg -c "program hd_firmware_L7_pad_flash.hex verify reset exit"`.
-
-Der CPU-Fault-Handler blinkt dort, wo das Display noch nicht läuft, in Gruppen mit je 0,3 s an/aus: **3×** (Markierung), Pause,
-**N×** (letzter abgeschlossener Boot-Schritt: 1 main, 2 MPU, 3 Caches, 4 HAL_Init, 5 Takt, 6 LCD, 7 Display an, 8 Touch, 9 Datenschicht,
-10 lv_init, 11 LVGL-Display, 12 LVGL-Eingabe, 13 ui_init, 14 Hauptschleife; **ein langer Blink = 0**, also Fault vor `main()`), Pause,
-**1–3×** (Taktquelle: 1 = HSI/16 MHz, 2 = HSE, 3 = PLL/216 MHz). Läuft das Display schon, zeigt es auf rotem Grund Register (PC, LR,
-CFSR, HFSR, BFAR, MMFAR, SP, HP) – bitte abfotografieren. Bleibt die LED stehen, hängt die Firmware.
-
-Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
-
-Selbst bauen (Linux/WSL, `gcc-arm-none-eabi` und `cmake` installiert; HAL/BSP werden automatisch geladen):
+Selbst bauen (Linux/WSL, `gcc-arm-none-eabi` und `cmake` installiert; HAL/BSP werden automatisch aus STM32CubeF7 geladen):
 
 ```sh
 cmake -S . -B build-stm32 -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
       -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build-stm32 --target hd_firmware     # -> build-stm32/hd_firmware.bin
+cmake --build build-stm32 --target hd_firmware     # -> build-stm32/hd_firmware.{hex,bin}
 ```
 
-Größe: ca. 453 KB Flash (43 %), 200 KB RAM (61 %).
+Größe: ca. 455 KB Flash (43 %), 200 KB RAM (61 %). Das Flashen habe ich nur für den Windows-PC beschrieben.
 
 ## Bauen & Ausprobieren (nativ, Linux / WSL)
 

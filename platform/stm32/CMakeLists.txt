@@ -59,22 +59,8 @@ target_compile_definitions(stm32_drivers PUBLIC STM32F746xx USE_HAL_DRIVER)
 target_compile_options(stm32_drivers PRIVATE -w) # Fremdcode: Warnungen nicht anzeigen
 
 # ---- Firmware ---------------------------------------------------------------------------
-# Ausbaustufe 0..12 (siehe main.c); 12 = komplette Anwendung
-set(HD_BOOT_LEVEL 12 CACHE STRING "Ausbaustufe der Firmware (0..12)")
-# RAM ab SRAM1 (0x20010000) statt ab DTCM (0x20000000): vermeidet Objekte, die die DTCM/SRAM1-Grenze ueberspannen
-option(HD_RAM_SRAM1 "Linker-Skript mit RAM erst ab SRAM1 verwenden" OFF)
 set(HD_LD_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH.ld)
-if(HD_RAM_SRAM1)
-    set(HD_LD_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH_SRAM1.ld)
-endif()
 add_executable(hd_firmware main.c stm32f7xx_it.c fault_screen.c)
-target_compile_definitions(hd_firmware PRIVATE HD_BOOT_LEVEL=${HD_BOOT_LEVEL})
-# Experimente zur Fehlersuche: "" | lvgl_link | pad_flash | pad_bss (siehe main.c)
-set(HD_EXPERIMENT "" CACHE STRING "Experiment zur Fehlersuche")
-if(HD_EXPERIMENT)
-    string(TOUPPER "${HD_EXPERIMENT}" HD_EXP_UP)
-    target_compile_definitions(hd_firmware PRIVATE HD_EXP_${HD_EXP_UP}=1)
-endif()
 target_link_libraries(hd_firmware PRIVATE hd_ui hd_core hd_config stm32_drivers)
 target_compile_options(hd_firmware PRIVATE -Wall -Wextra)
 target_link_options(hd_firmware PRIVATE

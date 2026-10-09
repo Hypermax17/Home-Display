@@ -20,7 +20,6 @@ void SysTick_Handler(void)
  *   SP      Stackzeiger zum Zeitpunkt des Faults        HP  Ende von .bss (Stack darf nicht darunter fallen)
  */
 extern uint32_t end; /* Linker-Symbol: Ende von .bss */
-extern volatile uint32_t g_boot_stage;
 
 /* Wartet 'cycles' Taktzyklen (DWT-Zaehler). Bricht nach 'cycles' Schleifendurchlaeufen ab, falls der Zaehler
  * nicht laeuft (jeder Durchlauf dauert >= 1 Zyklus, bei funktionierendem Zaehler greift das nie). */
@@ -69,8 +68,7 @@ void fault_c(uint32_t *frame)
         fault_screen_draw((uint16_t *)0xC0000000u, 480, 272, lines, 8);
     }
 
-    /* Blink-Meldung mit konstantem Tempo, unabhaengig vom Takt (Zykluszaehler DWT):
-     *   3x Fault-Markierung | N x letzte Boot-Stufe | 1/2/3 x Taktquelle (1 = HSI 16 MHz, 2 = HSE, 3 = PLL 216 MHz) */
+    /* LED1 blinkt 3x kurz, dann Pause. Tempo unabhaengig vom Takt (Zykluszaehler DWT; Takt aus der Taktquelle). */
     uint32_t sws = (RCC->CFGR & RCC_CFGR_SWS) >> RCC_CFGR_SWS_Pos; /* 0 HSI, 1 HSE, 2 PLL */
     uint32_t hz = (sws == 2) ? 216000000u : (sws == 1 ? 25000000u : 16000000u);
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -81,22 +79,13 @@ void fault_c(uint32_t *frame)
 
     BSP_LED_Init(LED1);
     for (;;) {
-        const uint32_t groups[3] = { 3, g_boot_stage, sws + 1 };
-        for (int g = 0; g < 3; g++) {
-            if (g == 1 && groups[g] == 0) { /* Stufe 0 = Fault vor main(): ein langer Blink statt Stille */
-                BSP_LED_On(LED1);
-                cyc_wait(1500u * cyc_ms);
-                BSP_LED_Off(LED1);
-                cyc_wait(300u * cyc_ms);
-            }
-            for (uint32_t i = 0; i < groups[g]; i++) {
-                BSP_LED_On(LED1);
-                cyc_wait(300u * cyc_ms);
-                BSP_LED_Off(LED1);
-                cyc_wait(300u * cyc_ms);
-            }
-            cyc_wait((g == 2 ? 3000u : 1200u) * cyc_ms);
+        for (int i = 0; i < 3; i++) {
+            BSP_LED_On(LED1);
+            cyc_wait(300u * cyc_ms);
+            BSP_LED_Off(LED1);
+            cyc_wait(300u * cyc_ms);
         }
+        cyc_wait(1500u * cyc_ms);
     }
 }
 

@@ -20,32 +20,23 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   firmware:
-    name: Firmware STM32F746G-DISCO (L7, flashinfo, pad_flash, L12 = komplette Anwendung)
+    name: Firmware STM32F746G-DISCO
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y cmake gcc-arm-none-eabi
-      - name: Firmware-Varianten bauen (L7 = Basis, Experimente je eine Aenderung gegenueber L7, L8 = naechster Schritt)
+      - name: Bauen
         run: |
-          mkdir -p out
-          # Format: Stufe:Experiment:Dateiname
-          for spec in "7::L7" "7:flashinfo:L7_flashinfo" "7:pad_flash:L7_pad_flash" "12::L12"; do
-            IFS=: read L X N <<< "$spec"
-            cmake -S . -B build-$N -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
-                  -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
-                  -DHD_BOOT_LEVEL=$L -DHD_EXPERIMENT="$X" -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
-            cmake --build build-$N -j --target hd_firmware
-            cp build-$N/hd_firmware.bin out/hd_firmware_$N.bin
-            cp build-$N/hd_firmware.hex out/hd_firmware_$N.hex
-          done
-          cp out/hd_firmware_L12.bin out/hd_firmware.bin
-          cp out/hd_firmware_L12.hex out/hd_firmware.hex
-          ls -l out
+          cmake -S . -B build-stm32 -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
+                -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-stm32 -j --target hd_firmware
       - uses: actions/upload-artifact@v4
         with:
           name: hd_firmware
           path: |
-            out/*.bin
-            out/*.hex
+            build-stm32/hd_firmware.hex
+            build-stm32/hd_firmware.bin
+            build-stm32/platform/stm32/hd_firmware.elf
+            build-stm32/hd_firmware.map
           if-no-files-found: error
