@@ -75,6 +75,10 @@ Programms, bekommt Müll und stürzt vor `main()` ab. LVGL ist nicht die Ursache
 2. `hd_firmware_L7_flashinfo.bin` flashen (26 KB, erreicht `main()`), die Zeilen `S1`…`S4` ablesen.
 Vollständig geschrieben sind `S1`, `S2`, `S3`, `S4` alle `A5A5A5A5`; bleibt `S2` oder höher abweichend, wird die Datei abgeschnitten.
 
+**Ergebnis des Prüfablaufs:** `S1…S4` blieben auch nach frischem Flashen von `pad_flash.bin` unverändert (nur `S1` = `A5A5A5A5`). Das ST-LINK-Laufwerk
+schreibt große Dateien also nicht vollständig. **Große Dateien (die komplette Anwendung, `hd_firmware.hex`/`.bin` = Stufe 12) deshalb über die
+Debug-Schnittstelle flashen** (nächster Abschnitt); nur Programme unter ~32 KB per Drag-and-Drop.
+
 **Wege, größere Dateien zuverlässig zu flashen:**
 * Drag-and-Drop robuster machen: Windows-Datenträgerrichtlinie auf *Schnelles Entfernen* stellen (Geräte-Manager → Laufwerke →
   „MBED microcontroller“ → Eigenschaften → Richtlinien), Datei per `copy hd_firmware.bin X:\` in der Eingabeaufforderung kopieren und
