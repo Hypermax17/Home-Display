@@ -54,17 +54,29 @@ Die UI läuft als **Browser-Simulator** (WebAssembly, eine einzelne HTML-Datei, 
 Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schalten lokal.
 
 1. **Firmware besorgen** – ohne lokale Toolchain: GitHub → Reiter *Actions* → letzter Lauf von *CI* → Artifact **hd_firmware**
-   herunterladen und entpacken (enthält `hd_firmware.bin`). Selbst bauen: siehe unten.
+   herunterladen und entpacken. Es enthält `hd_firmware.bin` (= komplette Anwendung) sowie die Ausbaustufen
+   `hd_firmware_L0.bin` … `hd_firmware_L7.bin` für die Fehlersuche (siehe unten).
 2. **Board anschließen:** Micro-USB-Kabel in die Buchse **CN14 „ST-LINK“** (oben, neben dem Ethernet-Port), Rechner/Netzteil dahinter.
    Auf Windows erscheint ein Laufwerk **DIS_F746NG**.
 3. **`hd_firmware.bin` auf dieses Laufwerk kopieren.** Eine ST-LINK-LED blinkt während des Flashens, danach startet das Board neu.
 4. Erwartet: kurz rot/grün/blaue Balken (Test des Anzeigepfads), dann „Räume“, Bedienung per Touch wie im Browser-Simulator.
-   LED1 (grün) blinkt dann 1×/s.
-5. **Fehlersuche:** Hängt oder stürzt die Firmware ab, startet sie nach spätestens ~8 s von selbst neu und meldet danach 3× per LED1,
-   wo es klemmte: **N langsame Blinks** = Boot-Stufe N war zuletzt fertig (Fehler im Schritt danach), dann **1 schneller Blink** =
-   Hänger, **2 schnelle Blinks** = CPU-Fault. Stufen: 1 main · 2 MPU/Caches · 3 HAL_Init · 4 Takt 216 MHz · 5 LCD+SDRAM ·
-   6 Testbild/Layer · 7 Display an · 8 Touch · 9 LVGL-Treiber · 10 UI · 11 Hauptschleife.
-   Nach Reset-Taster/Power-Cycle wird nichts gemeldet. Bitte Blink-Anzahl und Displayinhalt melden.
+   LED1 (grün) blinkt dabei 8× pro 3-Sekunden-Zyklus (Stufe 7).
+
+**Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu. Von unten nach oben flashen; die erste
+Stufe, die nicht mehr wie beschrieben läuft, grenzt den Fehler ein. LED1 blinkt in Stufe *N* genau *N+1*-mal pro 3 s (so
+erkennst du, welche Datei auf dem Board läuft). Dauerhaftes schnelles Blinken (5 Hz) = Init-Fehler, 3 sehr schnelle Blinks
+mit Pause = CPU-Fault.
+
+| Stufe | neu hinzugekommen | erwartet |
+|---|---|---|
+| 0 | HAL_Init, LED | LED 1 Puls / 3 s, Display weiß |
+| 1 | Takt 216 MHz | LED 2 Pulse |
+| 2 | I-/D-Cache | LED 3 Pulse |
+| 3 | MPU für SDRAM | LED 4 Pulse |
+| 4 | LCD- und SDRAM-Init | LED 5 Pulse, Display weiß |
+| 5 | Layer, Testbild, Display an | LED 6 Pulse, Farbbalken |
+| 6 | Touch-Init | LED 7 Pulse, Farbbalken |
+| 7 | LVGL, UI, Datenschicht | LED 8 Pulse, Anwendung |
 
 Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
 
