@@ -25,7 +25,7 @@ Proof of Concept (eine Lampe über KNX schalten). Die Anbindung läuft über ein
 * **`ui/`** – LVGL 9.2. Kennt kein KNX. Zustand kommt ausschließlich per Event, Bedienung geht ausschließlich als Kommando raus.
   Die UI zeigt immer den vom Bus bestätigten Zustand (Geräte mit Rückmeldeadresse), kein optimistisches Raten.
 * **`config/house_config.c`** – Räume, Geräte, Gruppenadressen. Später aus dem ETS-Export generiert (Schnittstelle `house_config()` bleibt).
-* **`platform/sim`** – PC-Simulator (SDL-Fenster oder headless) mit UDP-Transport. **`platform/stm32`** – Portplan (noch nicht umgesetzt).
+* **`platform/sim`** – PC-Simulator (SDL-Fenster, headless oder WebAssembly im Browser) mit UDP-Transport (nativ). **`platform/stm32`** – Portplan (noch nicht umgesetzt).
 
 Navigation: `Räume` → `Raum (Geräte)` → `Gerät (Detail, z. B. Dimmer)`; Zahnrad → `Einstellungen` (KNX-Status, Gateway, Version).
 Die Statusleiste zeigt dauerhaft den KNX-Link (grün verbunden / orange verbindet / rot getrennt); Befehle ohne Verbindung
@@ -33,7 +33,23 @@ werden mit Meldung abgewiesen.
 
 Unterstützte Gerätetypen im Mockup: Schalter (DPT 1), Dimmer (DPT 1 + 5.001), Temperatursensor (DPT 9).
 
-## Bauen & Ausprobieren (PC)
+## Ausprobieren ohne Linux (Windows / iPad / Mac)
+
+Die UI läuft als **Browser-Simulator** (WebAssembly, eine einzelne HTML-Datei, kein Install, Touch-Bedienung):
+
+* **Fertig gebaut:** `docs/index.html` im Browser öffnen (Windows: Datei herunterladen und doppelklicken; funktioniert auch offline).
+  Hinweis: GitHub zeigt HTML-Dateien nur als Text an – zum Ansehen herunterladen oder per GitHub Pages
+  (Settings → Pages → Branch/`docs`) hosten; so ist sie auch auf dem iPad per URL erreichbar.
+* Der Browser hat kein UDP, daher läuft dort das **Mock-Backend**: Alle Geräte sind lokal schaltbar, keine echte KNX-Verbindung.
+  Den KNX-Pfad (Gateway, Telegramme) decken die Unit-Tests ab; mit echter Hardware testest du ihn über die native Variante
+  (Linux/WSL, siehe unten) oder später direkt auf dem STM32.
+* Selbst bauen (Emscripten, läuft auch unter WSL/macOS):
+  ```sh
+  emcmake cmake -S . -B build-web -DHD_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=MinSizeRel
+  cmake --build build-web --target hd_web      # -> build-web/index.html
+  ```
+
+## Bauen & Ausprobieren (nativ, Linux / WSL)
 
 ```sh
 sudo apt install cmake gcc libsdl2-dev        # LVGL wird per CMake geladen (Internet nötig)

@@ -4,7 +4,11 @@
  * Der Datenservice laeuft in einem eigenen Thread -- wie spaeter als RTOS-Task.
  */
 #define _POSIX_C_SOURCE 200809L
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
 #include <pthread.h>
+#endif
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +20,9 @@
 #include "knx_ip.h"
 #include "lvgl.h"
 #include "sim_headless.h"
+#ifndef __EMSCRIPTEN__
 #include "sim_udp.h"
+#endif
 #include "ui.h"
 
 static uint32_t now_ms(void)
@@ -26,6 +32,9 @@ static uint32_t now_ms(void)
     return (uint32_t)(ts.tv_sec * 1000u + ts.tv_nsec / 1000000u);
 }
 
+static data_service_t g_ds;
+
+#ifndef __EMSCRIPTEN__
 static void sleep_ms(unsigned ms)
 {
     struct timespec ts = { ms / 1000, (long)(ms % 1000) * 1000000L };
@@ -33,8 +42,9 @@ static void sleep_ms(unsigned ms)
 }
 
 static atomic_bool g_run = true;
-static data_service_t g_ds;
+#endif
 
+#ifndef __EMSCRIPTEN__
 static void *data_thread(void *arg)
 {
     (void)arg;
@@ -44,6 +54,34 @@ static void *data_thread(void *arg)
     }
     return NULL;
 }
+#endif
+
+#ifdef __EMSCRIPTEN__
+static uint32_t g_rgba[480 * 272];
+
+/* Eingabe aus JavaScript (Maus/Touch) */
+EMSCRIPTEN_KEEPALIVE void hd_pointer(int x, int y, int down)
+{
+    sim_headless_pointer(x, y, down != 0);
+}
+
+static void web_loop(void)
+{
+    data_service_step(&g_ds, now_ms());
+    lv_timer_handler();
+    if (sim_headless_take_dirty()) {
+        const uint16_t *fb = sim_headless_framebuffer();
+        for (int i = 0; i < 480 * 272; i++) {
+            uint16_t c = fb[i];
+            uint32_t r = ((c >> 11) & 0x1F) * 255 / 31;
+            uint32_t g = ((c >> 5) & 0x3F) * 255 / 63;
+            uint32_t b = (c & 0x1F) * 255 / 31;
+            g_rgba[i] = 0xFF000000u | (b << 16) | (g << 8) | r; /* little endian RGBA */
+        }
+        EM_ASM({ if (Module.hdDraw) Module.hdDraw($0); }, g_rgba);
+    }
+}
+#endif
 
 static void usage(const char *a0)
 {
@@ -66,11 +104,18 @@ int main(int argc, char **argv)
 
     /* ---- Datenschicht ---- */
     static knx_mock_t mock;
+#ifndef __EMSCRIPTEN__
     static knx_ip_t kip;
     static sim_udp_t udp;
+#endif
     static knx_backend_t backend;
     static char gw_text[96] = "Mock (kein Bus)";
 
+#ifdef __EMSCRIPTEN__
+    (void)gateway; /* Browser: kein UDP -> immer Mock */
+    (void)script;
+    (void)shots;
+#else
     if (gateway) {
         char host[64];
         unsigned port = 3671;
@@ -84,7 +129,9 @@ int main(int argc, char **argv)
         knx_ip_init(&kip, &tp);
         backend = knx_ip_backend(&kip);
         snprintf(gw_text, sizeof(gw_text), "%s:%u", host, port);
-    } else {
+    } else
+#endif
+    {
         knx_mock_init(&mock);
         backend = knx_mock_backend(&mock);
     }
@@ -94,6 +141,10 @@ int main(int argc, char **argv)
     lv_init();
     lv_tick_set_cb(now_ms);
     lv_display_t *disp;
+#ifdef __EMSCRIPTEN__
+    (void)headless;
+    disp = sim_headless_create(NULL, NULL);
+#else
     if (headless) {
         disp = sim_headless_create(shots, script);
         if (!disp) return 1;
@@ -102,9 +153,15 @@ int main(int argc, char **argv)
         lv_sdl_window_set_title(disp, "Home Display (Simulator)");
         lv_sdl_mouse_create();
     }
+#endif
     ui_info_t info = { gw_text, "Mockup 0.1" };
     ui_init(disp, &info);
 
+#ifdef __EMSCRIPTEN__
+    /* Browser: eine Schleife fuer beides (kein Threading), vom Browser getaktet */
+    emscripten_set_main_loop(web_loop, 0, 1);
+    return 0;
+#else
     pthread_t th;
     pthread_create(&th, NULL, data_thread, NULL);
 
@@ -119,4 +176,5 @@ int main(int argc, char **argv)
     atomic_store(&g_run, false);
     pthread_join(th, NULL);
     return 0;
+#endif
 }

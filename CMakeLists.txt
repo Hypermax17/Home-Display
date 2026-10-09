@@ -42,7 +42,17 @@ target_link_libraries(hd_ui PUBLIC hd_core lvgl)
 target_compile_options(hd_ui PRIVATE -Wall -Wextra)
 
 # ---------------------------------------------------------------- Simulator
-if(HD_BUILD_SIM)
+if(HD_BUILD_SIM AND EMSCRIPTEN)
+    # Browser-Variante (WebAssembly): laeuft auf Windows/iPad/... im Browser, Mock-Backend
+    target_compile_definitions(lvgl PUBLIC HD_SIM=1 HD_WEB=1)
+    target_compile_definitions(hd_ui PUBLIC HD_SIM=1 HD_WEB=1)
+    add_executable(hd_web platform/sim/main.c platform/sim/sim_headless.c)
+    target_compile_options(hd_web PRIVATE -Wall -Wextra)
+    target_link_libraries(hd_web PRIVATE hd_ui hd_core hd_config)
+    target_link_options(hd_web PRIVATE -sALLOW_MEMORY_GROWTH=1 -sEXPORTED_RUNTIME_METHODS=ccall -sINITIAL_MEMORY=32MB
+        -sSINGLE_FILE=1 --shell-file ${CMAKE_CURRENT_SOURCE_DIR}/platform/web/shell.html)
+    set_target_properties(hd_web PROPERTIES OUTPUT_NAME index SUFFIX ".html")
+elseif(HD_BUILD_SIM)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
     target_link_libraries(lvgl PUBLIC PkgConfig::SDL2)

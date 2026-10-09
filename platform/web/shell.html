@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Home Display – Simulator</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #0b0e12; color: #c9d3de; font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 17px; font-weight: 600; margin: 4px 0 12px; }
+  .frame { background: #000; border-radius: 14px; padding: 10px; width: fit-content; max-width: 100%;
+           box-shadow: 0 0 0 2px #1e2630; margin: 0 auto; }
+  canvas { display: block; width: min(960px, calc(100vw - 52px)); aspect-ratio: 480 / 272;
+           image-rendering: auto; touch-action: none; outline: none; border-radius: 6px; }
+  p { color: #8a97a6; max-width: 70ch; margin: 14px auto 0; }
+  #status { text-align: center; color: #8a97a6; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Home Display – KNX-Visualisierung (Simulator im Browser)</h1>
+  <div class="frame"><canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas></div>
+  <div id="status">Lade …</div>
+  <p>Original-UI-Code des STM32-Displays (480×272), hier mit Mock-Backend: Alle Geräte sind lokal schaltbar,
+     es gibt keine echte KNX-Verbindung. Antippen: Raum öffnen · Lampe/Karte tippen = schalten · Dimmer-Karte
+     antippen = Detailseite · Zahnrad = Einstellungen.</p>
+</main>
+<script>
+  var W = 480, H = 272;
+  var cv = document.getElementById('canvas');
+  cv.width = W; cv.height = H;
+  var ctx = cv.getContext('2d');
+  var img = ctx.createImageData(W, H);
+
+  /* Frame aus dem WASM-Speicher aufs Canvas */
+  function hdDraw(ptr) {
+    img.data.set(Module.HEAPU8.subarray(ptr, ptr + W * H * 4));
+    ctx.putImageData(img, 0, 0);
+  }
+
+  /* Maus / Touch / Stift -> Zeiger des Displays */
+  function pos(e) {
+    var r = cv.getBoundingClientRect();
+    return [Math.max(0, Math.min(W - 1, Math.round((e.clientX - r.left) * W / r.width))),
+            Math.max(0, Math.min(H - 1, Math.round((e.clientY - r.top) * H / r.height)))];
+  }
+  function send(e, down) {
+    var p = pos(e);
+    Module.ccall('hd_pointer', null, ['number', 'number', 'number'], [p[0], p[1], down]);
+  }
+  var active = false;
+  cv.addEventListener('pointerdown', function (e) { active = true; cv.setPointerCapture(e.pointerId); send(e, 1); e.preventDefault(); });
+  cv.addEventListener('pointermove', function (e) { if (active) { send(e, 1); e.preventDefault(); } });
+  function up(e) { if (active) { active = false; send(e, 0); e.preventDefault(); } }
+  cv.addEventListener('pointerup', up);
+  cv.addEventListener('pointercancel', up);
+
+  var Module = {
+    hdDraw: hdDraw,
+    canvas: cv,
+    setStatus: function (t) { document.getElementById('status').textContent = t || ''; },
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.warn(t); }
+  };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

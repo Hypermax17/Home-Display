@@ -24,6 +24,7 @@ static bool g_started;
 static bool g_done;
 
 /* virtueller Zeiger */
+static bool g_dirty;
 static bool g_pressed;
 static int g_px, g_py;
 
@@ -31,6 +32,7 @@ static void flush_cb(lv_display_t *d, const lv_area_t *a, uint8_t *px)
 {
     (void)a;
     memcpy(g_fb, px, sizeof(g_fb));
+    g_dirty = true;
     lv_display_flush_ready(d);
 }
 
@@ -155,4 +157,23 @@ bool sim_headless_step(void)
         g_started = false;
     }
     return g_pos >= g_n;
+}
+
+void sim_headless_pointer(int x, int y, bool down)
+{
+    g_px = x;
+    g_py = y;
+    g_pressed = down;
+}
+
+const uint16_t *sim_headless_framebuffer(void)
+{
+    return g_fb;
+}
+
+bool sim_headless_take_dirty(void)
+{
+    bool d = g_dirty;
+    g_dirty = false;
+    return d;
 }
