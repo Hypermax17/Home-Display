@@ -55,7 +55,8 @@ target_include_directories(stm32_drivers PUBLIC
     ${CMSIS_DEV}/Include
     ${CUBE_DIR}/Drivers/CMSIS/Include
     ${BSP_DIR})
-target_compile_definitions(stm32_drivers PUBLIC STM32F746xx USE_HAL_DRIVER)
+# USER_VECT_TAB_ADDRESS: SystemInit setzt VTOR explizit auf den Flash (0x08000000)
+target_compile_definitions(stm32_drivers PUBLIC STM32F746xx USE_HAL_DRIVER USER_VECT_TAB_ADDRESS)
 target_compile_options(stm32_drivers PRIVATE -w) # Fremdcode: Warnungen nicht anzeigen
 
 # ---- Firmware ---------------------------------------------------------------------------

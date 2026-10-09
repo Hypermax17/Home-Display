@@ -8,7 +8,8 @@ _Min_Stack_Size = 0x4000;
 MEMORY
 {
   FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 1024K
-  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 320K
+  DIAG  (xrw) : ORIGIN = 0x20000000, LENGTH = 16     /* DTCM, nicht gecacht, ueberlebt Resets */
+  RAM   (xrw) : ORIGIN = 0x20000010, LENGTH = 320K - 16
 }
 
 SECTIONS
@@ -91,14 +92,14 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  /* Reset-fester Bereich fuer die Boot-Diagnose (diag.c): nicht initialisiert */
+  /* Reset-fester Bereich fuer die Boot-Diagnose (diag.c): nicht initialisiert, im DTCM (kein Cache) */
   .noinit (NOLOAD) :
   {
     . = ALIGN(4);
     *(.noinit)
     *(.noinit*)
     . = ALIGN(4);
-  } >RAM
+  } >DIAG
 
   ._user_heap_stack :
   {

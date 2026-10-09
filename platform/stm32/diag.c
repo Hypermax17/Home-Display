@@ -4,7 +4,8 @@
 
 #define DIAG_MAGIC 0xD1A60002u
 
-/* .noinit: wird vom Startup-Code weder geloescht noch initialisiert -> ueberlebt Watchdog-/Software-Reset */
+/* .noinit (Linker: DTCM @ 0x20000000, nicht gecacht): wird vom Startup-Code weder geloescht noch
+ * initialisiert -> ueberlebt Watchdog-/Software-Reset. Im gecachten SRAM ginge der Wert mit dem D-Cache verloren. */
 static volatile uint32_t g_magic __attribute__((section(".noinit")));
 static volatile uint32_t g_stage __attribute__((section(".noinit")));
 static volatile uint32_t g_fault __attribute__((section(".noinit")));
