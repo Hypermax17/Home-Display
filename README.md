@@ -65,15 +65,19 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
 **Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu (`HD_BOOT_LEVEL` 0–12, siehe `platform/stm32/main.c`).
 Stufe 0–7 laufen auf dem Board (Display zeigt Farbbalken). Stufe 8 (`lv_init` + LVGL-Tick) stürzt dagegen **vor** der ersten Zeile von
 `main()` ab (Takt noch 16 MHz), obwohl der neue Code dort noch gar nicht läuft. Verdacht: schon Größe oder Inhalt des Programms lösen es aus.
-Das Artifact enthält deshalb die Basis L7 und drei Experimente, die jeweils **nur eine Sache** zu L7 hinzufügen und nichts davon ausführen:
+Ergebnis der Experimente (jeweils nur eine Änderung gegenüber L7): `pad_bss` (viel RAM) läuft, `pad_flash` (nur 160 KB ungenutzte
+Konstanten im Flash) und `lvgl_link` stürzen vor `main()` ab. Es liegt also an der **Größe im Flash**, nicht an LVGL: Alle laufenden Dateien
+sind kleiner als 32 KB (= Flash-Sektor 0). Verdacht: Flash-Sektoren ab 1 werden nicht richtig beschrieben oder sind schreibgeschützt;
+der Startcode liest `.data` und `.init_array` hinter dem Code und bekommt dort Leerdaten.
+Zur Prüfung enthält das Artifact `.bin` **und** `.hex` von:
 
-| Datei | Zusatz gegenüber L7 | LED-Pulse / 5 s |
+| Datei | Zweck | LED-Pulse / 5 s |
 |---|---|---|
-| `hd_firmware_L7.bin` | – (Basis, läuft: Farbbalken) | 8 |
-| `hd_firmware_L7_lvgl_link.bin` | komplette Anwendung (LVGL + UI) mitgelinkt, nicht aufgerufen (454 KB Flash, 125 KB RAM) | 2 |
-| `hd_firmware_L7_pad_flash.bin` | 160 KB ungenutzte Konstanten im Flash (190 KB Flash) | 3 |
-| `hd_firmware_L7_pad_bss.bin` | 104 KB ungenutztes, nullinitialisiertes RAM (132 KB RAM) | 4 |
-| `hd_firmware_L8.bin` | `lv_init` + LVGL-Tick (ausgeführt) | 9 |
+| `hd_firmware_L7` | Basis (<32 KB), läuft: Farbbalken | 8 |
+| `hd_firmware_L7_flashinfo` | wie L7, zeigt zusätzlich Flash-Schutz (OPTCR/OPTCR1) und das erste Wort der Sektoren 1–6 als Text | 5 |
+| `hd_firmware_L7_pad_flash` | wie L7 + 160 KB Konstanten (stürzt bisher ab) | 3 |
+
+Außerdem: nach dem Kopieren einer großen Datei auf `DIS_F746NG` nachsehen, ob dort eine `FAIL.TXT` liegt, und deren Inhalt prüfen.
 
 Der CPU-Fault-Handler blinkt dort, wo das Display noch nicht läuft, in Gruppen mit je 0,3 s an/aus: **3×** (Markierung), Pause,
 **N×** (letzter abgeschlossener Boot-Schritt: 1 main, 2 MPU, 3 Caches, 4 HAL_Init, 5 Takt, 6 LCD, 7 Display an, 8 Touch, 9 Datenschicht,

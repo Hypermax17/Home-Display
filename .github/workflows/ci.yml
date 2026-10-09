@@ -30,17 +30,20 @@ jobs:
         run: |
           mkdir -p out
           # Format: Stufe:Experiment:Dateiname
-          for spec in "7::L7" "7:lvgl_link:L7_lvgl_link" "7:pad_flash:L7_pad_flash" "7:pad_bss:L7_pad_bss" "8::L8"; do
+          for spec in "7::L7" "7:flashinfo:L7_flashinfo" "7:pad_flash:L7_pad_flash"; do
             IFS=: read L X N <<< "$spec"
             cmake -S . -B build-$N -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
                   -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
                   -DHD_BOOT_LEVEL=$L -DHD_EXPERIMENT="$X" -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
             cmake --build build-$N -j --target hd_firmware
             cp build-$N/hd_firmware.bin out/hd_firmware_$N.bin
+            cp build-$N/hd_firmware.hex out/hd_firmware_$N.hex
           done
           ls -l out
       - uses: actions/upload-artifact@v4
         with:
           name: hd_firmware
-          path: out/*.bin
+          path: |
+            out/*.bin
+            out/*.hex
           if-no-files-found: error

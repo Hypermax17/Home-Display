@@ -53,6 +53,9 @@ __attribute__((used)) static const void *const k_keep_lvgl[] = {
 __attribute__((used)) static const uint32_t k_pad_flash[40960] = { P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au), P4096(0xA5A5A5A5u),
     P4096(0x5A5A5A5Au), P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au), P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au),
     P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au) };
+#elif defined(HD_EXP_FLASHINFO)
+#define HD_LED_PULSES 5
+#include "fault_screen.h"
 #elif defined(HD_EXP_PAD_BSS)
 #define HD_LED_PULSES 4
 __attribute__((used)) static volatile uint8_t k_pad_bss[104 * 1024];
@@ -189,6 +192,33 @@ __attribute__((unused)) static void draw_test_pattern(void)
     SCB_CleanDCache_by_Addr((uint32_t *)FB_ADDR, LCD_W * LCD_H * 2);
 }
 
+#ifdef HD_EXP_FLASHINFO
+static void hex8(char *out, uint32_t v)
+{
+    static const char d[] = "0123456789ABCDEF";
+    for (int i = 0; i < 8; i++) {
+        out[i] = d[(v >> (28 - 4 * i)) & 0xF];
+    }
+}
+
+/* Zeigt Flash-Schutz (Optionsbytes) und die ersten Worte der Flash-Sektoren 1..6 auf dem Display. */
+static void show_flash_info(void)
+{
+    static char l0[] = "OPTCR 00000000", l1[] = "OPTCR1 00000000", l2[] = "S1 00000000", l3[] = "S2 00000000";
+    static char l4[] = "S3 00000000", l5[] = "S4 00000000", l6[] = "S5 00000000", l7[] = "S6 00000000";
+    static const char *lines[] = { l0, l1, l2, l3, l4, l5, l6, l7 };
+    hex8(l0 + 6, FLASH->OPTCR);
+    hex8(l1 + 7, FLASH->OPTCR1);
+    /* Sektoren: S1 0x08008000, S2 0x08010000, S3 0x08018000, S4 0x08020000, S5 0x08040000, S6 0x08080000 */
+    static const uint32_t addr[6] = { 0x08008000u, 0x08010000u, 0x08018000u, 0x08020000u, 0x08040000u, 0x08080000u };
+    char *dst[6] = { l2 + 3, l3 + 3, l4 + 3, l5 + 3, l6 + 3, l7 + 3 };
+    for (int i = 0; i < 6; i++) {
+        hex8(dst[i], *(volatile const uint32_t *)addr[i]);
+    }
+    fault_screen_draw((uint16_t *)FB_ADDR, LCD_W, LCD_H, lines, 8);
+}
+#endif
+
 /* LED-Muster: HD_LED_PULSES Pulse pro 5-s-Zyklus (Standard: Stufe+1) */
 static void led_pattern(uint32_t now)
 {
@@ -235,6 +265,9 @@ int main(void)
     BSP_LCD_SelectLayer(0);
     BSP_LCD_DisplayOn();
     HAL_Delay(700);
+#ifdef HD_EXP_FLASHINFO
+    show_flash_info();
+#endif
     STAGE(7);
 #ifdef HD_TEST_FAULT
     __asm volatile("udf #0"); /* Test der Fault-Anzeige: undefinierte Anweisung -> UsageFault/HardFault */
