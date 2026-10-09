@@ -65,19 +65,23 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
 **Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu (`HD_BOOT_LEVEL` 0–12, siehe `platform/stm32/main.c`).
 Stufe 0–7 laufen auf dem Board (Display zeigt Farbbalken). Stufe 8 (`lv_init` + LVGL-Tick) stürzt dagegen **vor** der ersten Zeile von
 `main()` ab (Takt noch 16 MHz), obwohl der neue Code dort noch gar nicht läuft. Verdacht: schon Größe oder Inhalt des Programms lösen es aus.
-Ergebnis der Experimente (jeweils nur eine Änderung gegenüber L7): `pad_bss` (viel RAM) läuft, `pad_flash` (nur 160 KB ungenutzte
-Konstanten im Flash) und `lvgl_link` stürzen vor `main()` ab. Es liegt also an der **Größe im Flash**, nicht an LVGL: Alle laufenden Dateien
-sind kleiner als 32 KB (= Flash-Sektor 0). Verdacht: Flash-Sektoren ab 1 werden nicht richtig beschrieben oder sind schreibgeschützt;
-der Startcode liest `.data` und `.init_array` hinter dem Code und bekommt dort Leerdaten.
-Zur Prüfung enthält das Artifact `.bin` **und** `.hex` von:
+**Befund (Foto von `flashinfo`):** Flash-Schutz ist aus (`OPTCR = C0FFAAFD`, `OPTCR1 = 00400080`). Nach dem Flashen von `pad_flash.bin`
+(190 KB, überall `A5A5A5A5` an `S1`…`S4`) steht aber nur bei `S1` das Muster, bei `S2…S6` alter Inhalt: **große Dateien werden per
+Drag-and-Drop nur zum Teil in den Flash geschrieben** (ca. die ersten 32–64 KB). Der Startcode liest `.data` und `.init_array` am Ende des
+Programms, bekommt Müll und stürzt vor `main()` ab. LVGL ist nicht die Ursache; Programme unter 32 KB laufen.
 
-| Datei | Zweck | LED-Pulse / 5 s |
-|---|---|---|
-| `hd_firmware_L7` | Basis (<32 KB), läuft: Farbbalken | 8 |
-| `hd_firmware_L7_flashinfo` | wie L7, zeigt zusätzlich Flash-Schutz (OPTCR/OPTCR1) und das erste Wort der Sektoren 1–6 als Text | 5 |
-| `hd_firmware_L7_pad_flash` | wie L7 + 160 KB Konstanten (stürzt bisher ab) | 3 |
+**Prüfablauf für das Flashen großer Dateien** (bestanden = `S1…S4` zeigen je `A5A5A5A5`):
+1. `hd_firmware_L7_pad_flash.bin` flashen (stürzt erwartungsgemäß ab, Blinkmuster 3×/lang/1×).
+2. `hd_firmware_L7_flashinfo.bin` flashen (26 KB, erreicht `main()`), die Zeilen `S1`…`S4` ablesen.
+Vollständig geschrieben sind `S1`, `S2`, `S3`, `S4` alle `A5A5A5A5`; bleibt `S2` oder höher abweichend, wird die Datei abgeschnitten.
 
-Außerdem: nach dem Kopieren einer großen Datei auf `DIS_F746NG` nachsehen, ob dort eine `FAIL.TXT` liegt, und deren Inhalt prüfen.
+**Wege, größere Dateien zuverlässig zu flashen:**
+* Drag-and-Drop robuster machen: Windows-Datenträgerrichtlinie auf *Schnelles Entfernen* stellen (Geräte-Manager → Laufwerke →
+  „MBED microcontroller“ → Eigenschaften → Richtlinien), Datei per `copy hd_firmware.bin X:\` in der Eingabeaufforderung kopieren und
+  warten, bis die ST-LINK-LED aufhört zu blinken, bevor das Board getrennt oder zurückgesetzt wird.
+* Über die Debug-Schnittstelle des ST-LINK schreiben (Schreiben **mit Verifizierung**): *STM32CubeProgrammer* (kostenlos, ST-Konto nötig):
+  Verbinden („ST-LINK“, Mode *Normal*) → Reiter *Erasing & Programming* → `hd_firmware_*.hex` wählen → *Verify programming* an → *Start Programming*.
+  Alternativ OpenOCD: `openocd -f board/stm32f7discovery.cfg -c "program hd_firmware_L7_pad_flash.hex verify reset exit"`.
 
 Der CPU-Fault-Handler blinkt dort, wo das Display noch nicht läuft, in Gruppen mit je 0,3 s an/aus: **3×** (Markierung), Pause,
 **N×** (letzter abgeschlossener Boot-Schritt: 1 main, 2 MPU, 3 Caches, 4 HAL_Init, 5 Takt, 6 LCD, 7 Display an, 8 Touch, 9 Datenschicht,
