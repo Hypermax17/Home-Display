@@ -20,23 +20,22 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   firmware:
-    name: Firmware STM32F746G-DISCO (Stufen 6-12)
+    name: Firmware STM32F746G-DISCO (Stufen 6-8)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y cmake gcc-arm-none-eabi
-      - name: Ausbaustufen bauen (L6 = Gegenprobe, L7..L12 = Fehlersuche, L12 = komplette Anwendung)
+      - name: Ausbaustufen bauen (L6 = Gegenprobe, L7/L8 = Fehlersuche)
         run: |
           mkdir -p out
-          for L in 6 7 8 9 10 11 12; do
+          for L in 6 7 8; do
             cmake -S . -B build-L$L -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
                   -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
                   -DHD_BOOT_LEVEL=$L -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
             cmake --build build-L$L -j --target hd_firmware
             cp build-L$L/hd_firmware.bin out/hd_firmware_L$L.bin
           done
-          cp out/hd_firmware_L12.bin out/hd_firmware.bin
           ls -l out
       - uses: actions/upload-artifact@v4
         with:

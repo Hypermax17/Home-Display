@@ -63,10 +63,10 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
    LED1 (grün) blinkt dabei 8× pro 3-Sekunden-Zyklus (Stufe 7).
 
 **Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu (`HD_BOOT_LEVEL` 0–12, siehe `platform/stm32/main.c`).
-Das Artifact enthält die Stufen 6 (letzte bekannt funktionierende, Gegenprobe) bis 12 (komplette Anwendung). Von unten nach oben
+Das Artifact enthält derzeit nur die Stufen 6 (Gegenprobe), 7 und 8 (Fehlersuche); die komplette Anwendung ist Stufe 12 (`-DHD_BOOT_LEVEL=12`, noch nicht lauffähig auf dem Board). Von unten nach oben
 flashen; die erste Stufe, die nicht mehr wie beschrieben läuft, grenzt den Fehler ein. LED1 blinkt in Stufe *N* genau *N+1*-mal pro 5 s
 (so erkennst du, welche Datei auf dem Board läuft). Dauerhaftes schnelles Blinken (5 Hz) = Init-Fehler, 3 sehr schnelle Blinks
-mit Pause = CPU-Fault; ist zu dem Zeitpunkt das Display schon an, zeigt es auf rotem Grund Register (PC, LR, CFSR, HFSR, BFAR, MMFAR,
+mit Pause = CPU-Fault. Der Fault-Handler blinkt dann in Gruppen mit je 0,3 s an/aus: **3×** (Markierung), Pause, **N×** (letzter abgeschlossener Boot-Schritt, Nummern siehe `main.c`: 1 main, 2 MPU, 3 Caches, 4 HAL_Init, 5 Takt, 6 LCD, 7 Display an, 8 Touch, 9 Datenschicht, 10 lv_init, 11 LVGL-Display, 12 LVGL-Eingabe, 13 ui_init, 14 Hauptschleife), Pause, **1–3×** (Taktquelle: 1 = HSI/16 MHz, 2 = HSE, 3 = PLL/216 MHz). Ist zu dem Zeitpunkt das Display schon an, zeigt es auf rotem Grund Register (PC, LR, CFSR, HFSR, BFAR, MMFAR,
 SP, HP) – bitte abfotografieren. Bleibt die LED stehen, hängt die Firmware.
 
 | Stufe | neu hinzugekommen | erwartet |

@@ -31,6 +31,12 @@
 #define HD_BOOT_LEVEL 12
 #endif
 
+/* Letzter abgeschlossener Boot-Schritt; der Fault-Handler (stm32f7xx_it.c) blinkt diese Nummer.
+ *  1 main  2 MPU  3 Caches  4 HAL_Init  5 Takt  6 LCD-Init  7 Display an  8 Touch-Init  9 Datenschicht
+ *  10 lv_init+Tick  11 LVGL-Display  12 LVGL-Eingabe  13 ui_init  14 Hauptschleife (1. Durchlauf) */
+volatile uint32_t g_boot_stage;
+#define STAGE(n) (g_boot_stage = (n))
+
 #define LCD_W 480
 #define LCD_H 272
 #define FB_ADDR SDRAM_DEVICE_ADDR /* 0xC0000000, 480*272*2 = 255 KB */
@@ -167,17 +173,22 @@ static void led_pattern(uint32_t now)
 
 int main(void)
 {
+    STAGE(1);
 #if HD_BOOT_LEVEL >= 3
     mpu_config();
 #endif
+    STAGE(2);
 #if HD_BOOT_LEVEL >= 2
     SCB_EnableICache();
     SCB_EnableDCache();
 #endif
+    STAGE(3);
     HAL_Init();
+    STAGE(4);
 #if HD_BOOT_LEVEL >= 1
     system_clock_config();
 #endif
+    STAGE(5);
 
     BSP_LED_Init(LED1);
 
@@ -186,6 +197,7 @@ int main(void)
     if (BSP_LCD_Init() != LCD_OK) {
         fatal();
     }
+    STAGE(6);
 #endif
 #if HD_BOOT_LEVEL >= 5
     draw_test_pattern();
@@ -193,6 +205,7 @@ int main(void)
     BSP_LCD_SelectLayer(0);
     BSP_LCD_DisplayOn();
     HAL_Delay(700);
+    STAGE(7);
 #ifdef HD_TEST_FAULT
     __asm volatile("udf #0"); /* Test der Fault-Anzeige: undefinierte Anweisung -> UsageFault/HardFault */
 #endif
@@ -201,31 +214,37 @@ int main(void)
     if (BSP_TS_Init(LCD_W, LCD_H) != TS_OK) {
         fatal();
     }
+    STAGE(8);
 #endif
 #if HD_BOOT_LEVEL >= 7
     /* Datenschicht (Mock: Schaltbefehle kommen als Echo zurueck) */
     knx_mock_init(&g_mock);
     g_backend = knx_mock_backend(&g_mock);
     data_service_init(&g_ds, house_config(), &g_backend);
+    STAGE(9);
 #endif
 #if HD_BOOT_LEVEL >= 8
     lv_init();
     lv_tick_set_cb(HAL_GetTick);
+    STAGE(10);
 #endif
 #if HD_BOOT_LEVEL >= 9
     lv_display_t *disp = lv_display_create(LCD_W, LCD_H);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(disp, draw_buf1, draw_buf2, sizeof(draw_buf1), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(disp, flush_cb);
+    STAGE(11);
 #endif
 #if HD_BOOT_LEVEL >= 10
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
+    STAGE(12);
 #endif
 #if HD_BOOT_LEVEL >= 11
     static const ui_info_t info = { "Mock (kein Bus)", "Mockup 0.1 (STM32)" };
     ui_init(disp, &info);
+    STAGE(13);
 #endif
 
     for (;;) {
@@ -237,6 +256,7 @@ int main(void)
         lv_timer_handler();
 #endif
         led_pattern(now);
+        STAGE(14);
         HAL_Delay(2);
     }
 }
