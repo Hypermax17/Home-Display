@@ -190,6 +190,9 @@ int main(void)
     BSP_LCD_SelectLayer(0);
     BSP_LCD_DisplayOn();
     HAL_Delay(700);
+#ifdef HD_TEST_FAULT
+    __asm volatile("udf #0"); /* Test der Fault-Anzeige: undefinierte Anweisung -> UsageFault/HardFault */
+#endif
 #endif
 #if HD_BOOT_LEVEL >= 6
     if (BSP_TS_Init(LCD_W, LCD_H) != TS_OK) {

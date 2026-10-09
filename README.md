@@ -65,7 +65,8 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
 **Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu. Von unten nach oben flashen; die erste
 Stufe, die nicht mehr wie beschrieben läuft, grenzt den Fehler ein. LED1 blinkt in Stufe *N* genau *N+1*-mal pro 3 s (so
 erkennst du, welche Datei auf dem Board läuft). Dauerhaftes schnelles Blinken (5 Hz) = Init-Fehler, 3 sehr schnelle Blinks
-mit Pause = CPU-Fault.
+mit Pause = CPU-Fault; dabei zeigt das Display auf rotem Grund Register (PC, LR, CFSR, HFSR, BFAR, MMFAR, SP, HP) –
+bitte abfotografieren.
 
 | Stufe | neu hinzugekommen | erwartet |
 |---|---|---|

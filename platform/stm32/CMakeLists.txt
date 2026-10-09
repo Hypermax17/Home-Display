@@ -61,7 +61,7 @@ target_compile_options(stm32_drivers PRIVATE -w) # Fremdcode: Warnungen nicht an
 # ---- Firmware ---------------------------------------------------------------------------
 # Ausbaustufe 0..7 (siehe main.c); 7 = komplette Anwendung
 set(HD_BOOT_LEVEL 7 CACHE STRING "Ausbaustufe der Firmware (0..7)")
-add_executable(hd_firmware main.c stm32f7xx_it.c)
+add_executable(hd_firmware main.c stm32f7xx_it.c fault_screen.c)
 target_compile_definitions(hd_firmware PRIVATE HD_BOOT_LEVEL=${HD_BOOT_LEVEL})
 target_link_libraries(hd_firmware PRIVATE hd_ui hd_core hd_config stm32_drivers)
 target_compile_options(hd_firmware PRIVATE -Wall -Wextra)
