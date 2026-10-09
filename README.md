@@ -63,22 +63,23 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
    LED1 (grün) blinkt dabei 8× pro 3-Sekunden-Zyklus (Stufe 7).
 
 **Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu (`HD_BOOT_LEVEL` 0–12, siehe `platform/stm32/main.c`).
-Das Artifact enthält derzeit nur die Stufen 6 (Gegenprobe), 7 und 8 (Fehlersuche); die komplette Anwendung ist Stufe 12 (`-DHD_BOOT_LEVEL=12`, noch nicht lauffähig auf dem Board). Von unten nach oben
-flashen; die erste Stufe, die nicht mehr wie beschrieben läuft, grenzt den Fehler ein. LED1 blinkt in Stufe *N* genau *N+1*-mal pro 5 s
-(so erkennst du, welche Datei auf dem Board läuft). Dauerhaftes schnelles Blinken (5 Hz) = Init-Fehler, 3 sehr schnelle Blinks
-mit Pause = CPU-Fault. Der Fault-Handler blinkt dann in Gruppen mit je 0,3 s an/aus: **3×** (Markierung), Pause, **N×** (letzter abgeschlossener Boot-Schritt, Nummern siehe `main.c`: 1 main, 2 MPU, 3 Caches, 4 HAL_Init, 5 Takt, 6 LCD, 7 Display an, 8 Touch, 9 Datenschicht, 10 lv_init, 11 LVGL-Display, 12 LVGL-Eingabe, 13 ui_init, 14 Hauptschleife), Pause, **1–3×** (Taktquelle: 1 = HSI/16 MHz, 2 = HSE, 3 = PLL/216 MHz). Ist zu dem Zeitpunkt das Display schon an, zeigt es auf rotem Grund Register (PC, LR, CFSR, HFSR, BFAR, MMFAR,
-SP, HP) – bitte abfotografieren. Bleibt die LED stehen, hängt die Firmware.
+Stufe 0–7 laufen auf dem Board (Display zeigt Farbbalken). Stufe 8 (`lv_init` + LVGL-Tick) stürzt dagegen **vor** der ersten Zeile von
+`main()` ab (Takt noch 16 MHz), obwohl der neue Code dort noch gar nicht läuft. Verdacht: schon Größe oder Inhalt des Programms lösen es aus.
+Das Artifact enthält deshalb die Basis L7 und drei Experimente, die jeweils **nur eine Sache** zu L7 hinzufügen und nichts davon ausführen:
 
-| Stufe | neu hinzugekommen | erwartet |
+| Datei | Zusatz gegenüber L7 | LED-Pulse / 5 s |
 |---|---|---|
-| 0–5 | HAL, Takt, Caches, MPU, LCD/SDRAM, Layer + Testbild (hier nicht mehr im Artifact, liefen) | |
-| 6 | Touch-Init | Farbbalken, LED 7 Pulse |
-| 7 | Datenschicht (Mock-Backend, Datenservice) | Farbbalken, LED 8 Pulse |
-| 8 | `lv_init`, LVGL-Tick | Farbbalken, LED 9 Pulse |
-| 9 | LVGL-Display (Zeichenpuffer, Flush-Callback) | Farbbalken, LED 10 Pulse |
-| 10 | LVGL-Eingabegerät (Touch-Callback) | Farbbalken, LED 11 Pulse |
-| 11 | `ui_init` (Widgets anlegen, noch nicht rendern) | Farbbalken, LED 12 Pulse |
-| 12 | `lv_timer_handler` (Rendern, Touch lesen) | Anwendung „Räume“, LED 13 Pulse |
+| `hd_firmware_L7.bin` | – (Basis, läuft: Farbbalken) | 8 |
+| `hd_firmware_L7_lvgl_link.bin` | komplette Anwendung (LVGL + UI) mitgelinkt, nicht aufgerufen (454 KB Flash, 125 KB RAM) | 2 |
+| `hd_firmware_L7_pad_flash.bin` | 160 KB ungenutzte Konstanten im Flash (190 KB Flash) | 3 |
+| `hd_firmware_L7_pad_bss.bin` | 104 KB ungenutztes, nullinitialisiertes RAM (132 KB RAM) | 4 |
+| `hd_firmware_L8.bin` | `lv_init` + LVGL-Tick (ausgeführt) | 9 |
+
+Der CPU-Fault-Handler blinkt dort, wo das Display noch nicht läuft, in Gruppen mit je 0,3 s an/aus: **3×** (Markierung), Pause,
+**N×** (letzter abgeschlossener Boot-Schritt: 1 main, 2 MPU, 3 Caches, 4 HAL_Init, 5 Takt, 6 LCD, 7 Display an, 8 Touch, 9 Datenschicht,
+10 lv_init, 11 LVGL-Display, 12 LVGL-Eingabe, 13 ui_init, 14 Hauptschleife; **ein langer Blink = 0**, also Fault vor `main()`), Pause,
+**1–3×** (Taktquelle: 1 = HSI/16 MHz, 2 = HSE, 3 = PLL/216 MHz). Läuft das Display schon, zeigt es auf rotem Grund Register (PC, LR,
+CFSR, HFSR, BFAR, MMFAR, SP, HP) – bitte abfotografieren. Bleibt die LED stehen, hängt die Firmware.
 
 Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
 

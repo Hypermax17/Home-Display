@@ -31,6 +31,36 @@
 #define HD_BOOT_LEVEL 12
 #endif
 
+/*
+ * Experimente (je eine Aenderung gegenueber der Basisstufe, siehe README):
+ *   HD_EXP_LVGL_LINK  komplette Anwendung (LVGL + UI) wird mitgelinkt, aber NICHT aufgerufen
+ *   HD_EXP_PAD_FLASH  160 KB zusaetzliche Konstanten im Flash, ungenutzt
+ *   HD_EXP_PAD_BSS    104 KB zusaetzliches, nullinitialisiertes RAM (.bss), ungenutzt
+ * Testet, ob schon Groesse/Inhalt des Programms den Absturz vor main() ausloesen.
+ */
+#if defined(HD_EXP_LVGL_LINK)
+#define HD_LED_PULSES 2
+__attribute__((used)) static const void *const k_keep_lvgl[] = {
+    (const void *)lv_init, (const void *)lv_tick_set_cb, (const void *)lv_display_create,
+    (const void *)lv_indev_create, (const void *)lv_timer_handler, (const void *)ui_init,
+};
+#elif defined(HD_EXP_PAD_FLASH)
+#define HD_LED_PULSES 3
+#define P8(v) v, v, v, v, v, v, v, v
+#define P64(v) P8(v), P8(v), P8(v), P8(v), P8(v), P8(v), P8(v), P8(v)
+#define P512(v) P64(v), P64(v), P64(v), P64(v), P64(v), P64(v), P64(v), P64(v)
+#define P4096(v) P512(v), P512(v), P512(v), P512(v), P512(v), P512(v), P512(v), P512(v)
+__attribute__((used)) static const uint32_t k_pad_flash[40960] = { P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au), P4096(0xA5A5A5A5u),
+    P4096(0x5A5A5A5Au), P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au), P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au),
+    P4096(0xA5A5A5A5u), P4096(0x5A5A5A5Au) };
+#elif defined(HD_EXP_PAD_BSS)
+#define HD_LED_PULSES 4
+__attribute__((used)) static volatile uint8_t k_pad_bss[104 * 1024];
+#endif
+#ifndef HD_LED_PULSES
+#define HD_LED_PULSES (HD_BOOT_LEVEL + 1)
+#endif
+
 /* Letzter abgeschlossener Boot-Schritt; der Fault-Handler (stm32f7xx_it.c) blinkt diese Nummer.
  *  1 main  2 MPU  3 Caches  4 HAL_Init  5 Takt  6 LCD-Init  7 Display an  8 Touch-Init  9 Datenschicht
  *  10 lv_init+Tick  11 LVGL-Display  12 LVGL-Eingabe  13 ui_init  14 Hauptschleife (1. Durchlauf) */
@@ -159,11 +189,11 @@ __attribute__((unused)) static void draw_test_pattern(void)
     SCB_CleanDCache_by_Addr((uint32_t *)FB_ADDR, LCD_W * LCD_H * 2);
 }
 
-/* LED-Muster: (HD_BOOT_LEVEL+1) Pulse pro 5-s-Zyklus */
+/* LED-Muster: HD_LED_PULSES Pulse pro 5-s-Zyklus (Standard: Stufe+1) */
 static void led_pattern(uint32_t now)
 {
     uint32_t t = now % 5000u;
-    bool on = t < (uint32_t)(HD_BOOT_LEVEL + 1) * 300u && (t % 300u) < 150u;
+    bool on = t < (uint32_t)HD_LED_PULSES * 300u && (t % 300u) < 150u;
     if (on) {
         BSP_LED_On(LED1);
     } else {
@@ -256,6 +286,13 @@ int main(void)
         lv_timer_handler();
 #endif
         led_pattern(now);
+#if defined(HD_EXP_PAD_BSS)
+        k_pad_bss[now % sizeof(k_pad_bss)] = 1;
+#elif defined(HD_EXP_PAD_FLASH)
+        __asm volatile("" ::"r"(k_pad_flash)); /* Adresse referenzieren, damit der Linker das Feld behaelt */
+#elif defined(HD_EXP_LVGL_LINK)
+        __asm volatile("" ::"r"(k_keep_lvgl)); /* referenziert LVGL + UI, ohne sie auszufuehren */
+#endif
         STAGE(14);
         HAL_Delay(2);
     }

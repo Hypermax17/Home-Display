@@ -83,6 +83,12 @@ void fault_c(uint32_t *frame)
     for (;;) {
         const uint32_t groups[3] = { 3, g_boot_stage, sws + 1 };
         for (int g = 0; g < 3; g++) {
+            if (g == 1 && groups[g] == 0) { /* Stufe 0 = Fault vor main(): ein langer Blink statt Stille */
+                BSP_LED_On(LED1);
+                cyc_wait(1500u * cyc_ms);
+                BSP_LED_Off(LED1);
+                cyc_wait(300u * cyc_ms);
+            }
             for (uint32_t i = 0; i < groups[g]; i++) {
                 BSP_LED_On(LED1);
                 cyc_wait(300u * cyc_ms);

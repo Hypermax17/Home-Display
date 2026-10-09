@@ -20,21 +20,23 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   firmware:
-    name: Firmware STM32F746G-DISCO (Stufen 6-8)
+    name: Firmware STM32F746G-DISCO (Basis L7, Experimente, L8)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y cmake gcc-arm-none-eabi
-      - name: Ausbaustufen bauen (L6 = Gegenprobe, L7/L8 = Fehlersuche)
+      - name: Firmware-Varianten bauen (L7 = Basis, Experimente je eine Aenderung gegenueber L7, L8 = naechster Schritt)
         run: |
           mkdir -p out
-          for L in 6 7 8; do
-            cmake -S . -B build-L$L -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
+          # Format: Stufe:Experiment:Dateiname
+          for spec in "7::L7" "7:lvgl_link:L7_lvgl_link" "7:pad_flash:L7_pad_flash" "7:pad_bss:L7_pad_bss" "8::L8"; do
+            IFS=: read L X N <<< "$spec"
+            cmake -S . -B build-$N -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
                   -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
-                  -DHD_BOOT_LEVEL=$L -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
-            cmake --build build-L$L -j --target hd_firmware
-            cp build-L$L/hd_firmware.bin out/hd_firmware_L$L.bin
+                  -DHD_BOOT_LEVEL=$L -DHD_EXPERIMENT="$X" -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
+            cmake --build build-$N -j --target hd_firmware
+            cp build-$N/hd_firmware.bin out/hd_firmware_$N.bin
           done
           ls -l out
       - uses: actions/upload-artifact@v4
