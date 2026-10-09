@@ -62,23 +62,23 @@ Die Firmware läuft mit dem Mock-Backend, also ohne Netzwerk, alle Geräte schal
 4. Erwartet: kurz rot/grün/blaue Balken (Test des Anzeigepfads), dann „Räume“, Bedienung per Touch wie im Browser-Simulator.
    LED1 (grün) blinkt dabei 8× pro 3-Sekunden-Zyklus (Stufe 7).
 
-**Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu. Von unten nach oben flashen; die erste
-Stufe, die nicht mehr wie beschrieben läuft, grenzt den Fehler ein. LED1 blinkt in Stufe *N* genau *N+1*-mal pro 3 s (so
-erkennst du, welche Datei auf dem Board läuft). Dauerhaftes schnelles Blinken (5 Hz) = Init-Fehler, 3 sehr schnelle Blinks
-mit Pause = CPU-Fault; dabei zeigt das Display auf rotem Grund Register (PC, LR, CFSR, HFSR, BFAR, MMFAR, SP, HP) –
-bitte abfotografieren.
+**Fehlersuche – Ausbaustufen:** Jede Stufe fügt genau einen Schritt zur vorigen hinzu (`HD_BOOT_LEVEL` 0–12, siehe `platform/stm32/main.c`).
+Das Artifact enthält die Stufen 6 (letzte bekannt funktionierende, Gegenprobe) bis 12 (komplette Anwendung). Von unten nach oben
+flashen; die erste Stufe, die nicht mehr wie beschrieben läuft, grenzt den Fehler ein. LED1 blinkt in Stufe *N* genau *N+1*-mal pro 5 s
+(so erkennst du, welche Datei auf dem Board läuft). Dauerhaftes schnelles Blinken (5 Hz) = Init-Fehler, 3 sehr schnelle Blinks
+mit Pause = CPU-Fault; ist zu dem Zeitpunkt das Display schon an, zeigt es auf rotem Grund Register (PC, LR, CFSR, HFSR, BFAR, MMFAR,
+SP, HP) – bitte abfotografieren. Bleibt die LED stehen, hängt die Firmware.
 
 | Stufe | neu hinzugekommen | erwartet |
 |---|---|---|
-| 0 | HAL_Init, LED | LED 1 Puls / 3 s, Display weiß |
-| 1 | Takt 216 MHz | LED 2 Pulse |
-| 2 | I-/D-Cache | LED 3 Pulse |
-| 3 | MPU für SDRAM | LED 4 Pulse |
-| 4 | LCD- und SDRAM-Init | LED 5 Pulse, Display weiß |
-| 5 | Layer, Testbild, Display an | LED 6 Pulse, Farbbalken |
-| 6 | Touch-Init | LED 7 Pulse, Farbbalken |
-| 7 | LVGL, UI, Datenschicht | LED 8 Pulse, Anwendung |
-| 7 (`_sram1`) | wie 7, RAM erst ab 0x20010000 (statt DTCM) | wie 7 |
+| 0–5 | HAL, Takt, Caches, MPU, LCD/SDRAM, Layer + Testbild (hier nicht mehr im Artifact, liefen) | |
+| 6 | Touch-Init | Farbbalken, LED 7 Pulse |
+| 7 | Datenschicht (Mock-Backend, Datenservice) | Farbbalken, LED 8 Pulse |
+| 8 | `lv_init`, LVGL-Tick | Farbbalken, LED 9 Pulse |
+| 9 | LVGL-Display (Zeichenpuffer, Flush-Callback) | Farbbalken, LED 10 Pulse |
+| 10 | LVGL-Eingabegerät (Touch-Callback) | Farbbalken, LED 11 Pulse |
+| 11 | `ui_init` (Widgets anlegen, noch nicht rendern) | Farbbalken, LED 12 Pulse |
+| 12 | `lv_timer_handler` (Rendern, Touch lesen) | Anwendung „Räume“, LED 13 Pulse |
 
 Das Flashen habe ich nur für den Windows-PC beschrieben; ob das iPad das ST-LINK-Laufwerk beschreiben kann, ist ungetestet.
 

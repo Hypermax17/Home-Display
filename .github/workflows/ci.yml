@@ -20,29 +20,23 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   firmware:
-    name: Firmware STM32F746G-DISCO (Stufen 0-7)
+    name: Firmware STM32F746G-DISCO (Stufen 6-12)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y cmake gcc-arm-none-eabi
-      - name: Alle Ausbaustufen bauen
+      - name: Ausbaustufen bauen (L6 = Gegenprobe, L7..L12 = Fehlersuche, L12 = komplette Anwendung)
         run: |
           mkdir -p out
-          for L in 0 1 2 3 4 5 6 7; do
+          for L in 6 7 8 9 10 11 12; do
             cmake -S . -B build-L$L -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
                   -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
                   -DHD_BOOT_LEVEL=$L -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
             cmake --build build-L$L -j --target hd_firmware
             cp build-L$L/hd_firmware.bin out/hd_firmware_L$L.bin
           done
-          # Variante von Stufe 7 mit RAM ab SRAM1 (0x20010000) statt ab DTCM
-          cmake -S . -B build-L7s -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake \
-                -DHD_BUILD_SIM=OFF -DHD_BUILD_TESTS=OFF -DHD_BUILD_STM32=ON -DCMAKE_BUILD_TYPE=Release \
-                -DHD_BOOT_LEVEL=7 -DHD_RAM_SRAM1=ON -DCUBE_DIR=$PWD/cube -DFETCHCONTENT_BASE_DIR=$PWD/_deps
-          cmake --build build-L7s -j --target hd_firmware
-          cp build-L7s/hd_firmware.bin out/hd_firmware_L7_sram1.bin
-          cp out/hd_firmware_L7.bin out/hd_firmware.bin
+          cp out/hd_firmware_L12.bin out/hd_firmware.bin
           ls -l out
       - uses: actions/upload-artifact@v4
         with:

@@ -5,11 +5,14 @@
  * Laufzeit:   eine Hauptschleife (Datenservice + LVGL). UI und Daten sind ueber app_bus
  *             entkoppelt und lassen sich spaeter ohne Aenderung auf zwei RTOS-Tasks verteilen.
  * Fehlersuche per Ausbaustufe (HD_BOOT_LEVEL, jede Stufe fuegt genau EINEN Schritt hinzu):
- *   0 HAL_Init + LED          4 + BSP_LCD_Init (inkl. SDRAM-Init)
- *   1 + Takt 216 MHz          5 + Layer, Testbild, Display an
- *   2 + I-/D-Cache            6 + Touch-Init
- *   3 + MPU (SDRAM)           7 + LVGL, UI, Datenschicht (komplette Anwendung)
- * LED1 (gruen, PI1) blinkt in Stufe N genau (N+1)-mal pro 3-s-Zyklus, damit man sieht, welche Stufe laeuft.
+ *   0 HAL_Init + LED           6 + Touch-Init
+ *   1 + Takt 216 MHz           7 + Datenschicht (Mock-Backend, Datenservice)
+ *   2 + I-/D-Cache             8 + lv_init, LVGL-Tick
+ *   3 + MPU (SDRAM)            9 + LVGL-Display (Puffer, Flush-Callback)
+ *   4 + BSP_LCD_Init          10 + LVGL-Eingabegeraet (Touch)
+ *   5 + Layer, Testbild, an   11 + ui_init (Widgets anlegen)
+ *                             12 + lv_timer_handler (Rendern, Flush, Touch lesen) = komplette Anwendung
+ * LED1 (gruen, PI1) blinkt in Stufe N genau (N+1)-mal pro 5-s-Zyklus, damit man sieht, welche Stufe laeuft.
  * Schnelles Dauerblinken (5 Hz) = Init-Fehler (fatal), 3 sehr schnelle Blinks mit Pause = CPU-Fault.
  */
 #include <string.h>
@@ -25,7 +28,7 @@
 #include "ui.h"
 
 #ifndef HD_BOOT_LEVEL
-#define HD_BOOT_LEVEL 7
+#define HD_BOOT_LEVEL 12
 #endif
 
 #define LCD_W 480
@@ -150,10 +153,10 @@ __attribute__((unused)) static void draw_test_pattern(void)
     SCB_CleanDCache_by_Addr((uint32_t *)FB_ADDR, LCD_W * LCD_H * 2);
 }
 
-/* LED-Muster: (HD_BOOT_LEVEL+1) Pulse pro 3-s-Zyklus */
+/* LED-Muster: (HD_BOOT_LEVEL+1) Pulse pro 5-s-Zyklus */
 static void led_pattern(uint32_t now)
 {
-    uint32_t t = now % 3000u;
+    uint32_t t = now % 5000u;
     bool on = t < (uint32_t)(HD_BOOT_LEVEL + 1) * 300u && (t % 300u) < 150u;
     if (on) {
         BSP_LED_On(LED1);
@@ -204,20 +207,23 @@ int main(void)
     knx_mock_init(&g_mock);
     g_backend = knx_mock_backend(&g_mock);
     data_service_init(&g_ds, house_config(), &g_backend);
-
-    /* UI */
+#endif
+#if HD_BOOT_LEVEL >= 8
     lv_init();
     lv_tick_set_cb(HAL_GetTick);
-
+#endif
+#if HD_BOOT_LEVEL >= 9
     lv_display_t *disp = lv_display_create(LCD_W, LCD_H);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(disp, draw_buf1, draw_buf2, sizeof(draw_buf1), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(disp, flush_cb);
-
+#endif
+#if HD_BOOT_LEVEL >= 10
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
-
+#endif
+#if HD_BOOT_LEVEL >= 11
     static const ui_info_t info = { "Mock (kein Bus)", "Mockup 0.1 (STM32)" };
     ui_init(disp, &info);
 #endif
@@ -226,6 +232,8 @@ int main(void)
         uint32_t now = HAL_GetTick();
 #if HD_BOOT_LEVEL >= 7
         data_service_step(&g_ds, now);
+#endif
+#if HD_BOOT_LEVEL >= 12
         lv_timer_handler();
 #endif
         led_pattern(now);

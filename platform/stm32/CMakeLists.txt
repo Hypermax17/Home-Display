@@ -59,8 +59,8 @@ target_compile_definitions(stm32_drivers PUBLIC STM32F746xx USE_HAL_DRIVER)
 target_compile_options(stm32_drivers PRIVATE -w) # Fremdcode: Warnungen nicht anzeigen
 
 # ---- Firmware ---------------------------------------------------------------------------
-# Ausbaustufe 0..7 (siehe main.c); 7 = komplette Anwendung
-set(HD_BOOT_LEVEL 7 CACHE STRING "Ausbaustufe der Firmware (0..7)")
+# Ausbaustufe 0..12 (siehe main.c); 12 = komplette Anwendung
+set(HD_BOOT_LEVEL 12 CACHE STRING "Ausbaustufe der Firmware (0..12)")
 # RAM ab SRAM1 (0x20010000) statt ab DTCM (0x20000000): vermeidet Objekte, die die DTCM/SRAM1-Grenze ueberspannen
 option(HD_RAM_SRAM1 "Linker-Skript mit RAM erst ab SRAM1 verwenden" OFF)
 set(HD_LD_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/STM32F746NGHx_FLASH.ld)
