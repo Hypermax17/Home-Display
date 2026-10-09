@@ -1,0 +1,14 @@
+# Wohnzimmer -> Deckenlicht (echte KNX-Lampe) 2x schalten
+wait 1500
+shot e2e_0_connected.ppm
+tap 80 100
+wait 400
+tap 100 90
+wait 800
+shot e2e_1_lamp_on.ppm
+tap 100 90
+wait 800
+shot e2e_2_lamp_off.ppm
+wait 3500
+shot e2e_3_after_wallswitch.ppm
+quit

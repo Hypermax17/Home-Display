@@ -1,0 +1,8 @@
+# Gateway nicht erreichbar: roter Link-Indikator + Fehlermeldung beim Schalten
+wait 800
+tap 80 100
+wait 500
+tap 100 90
+wait 400
+shot offline.ppm
+quit

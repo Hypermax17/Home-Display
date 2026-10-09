@@ -1,0 +1,25 @@
+# Rundgang durch die UI (Koordinaten fuer 480x272)
+wait 400
+shot 01_home.ppm
+tap 80 100
+wait 500
+shot 02_room.ppm
+tap 100 90
+wait 400
+shot 03_room_lamp_on.ppm
+tap 350 75
+wait 500
+shot 04_dimmer_detail.ppm
+drag 215 186 380 186
+wait 300
+shot 05_dimmer_detail_changed.ppm
+tap 28 22
+wait 500
+shot 06_room_dimmer_changed.ppm
+tap 28 22
+wait 500
+shot 07_home_after.ppm
+tap 450 22
+wait 500
+shot 08_settings.ppm
+quit
